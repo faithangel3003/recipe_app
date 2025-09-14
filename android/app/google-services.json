@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "275636489907",
+    "project_id": "ingrdnts-f505f",
+    "storage_bucket": "ingrdnts-f505f.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:275636489907:android:2496b7a8a11805dc5caac6",
+        "android_client_info": {
+          "package_name": "com.example.final_proj"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB1apwu9bveG4eI3d1-pJ1-Vtx2Wnd2S1w"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
