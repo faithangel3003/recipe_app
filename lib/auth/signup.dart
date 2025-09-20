@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-
 import 'package:firebase_auth/firebase_auth.dart';
-import '../home.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'login.dart';
 
 class SignUpScreen extends StatefulWidget {
   const SignUpScreen({super.key});
@@ -23,14 +23,25 @@ class _SignUpScreenState extends State<SignUpScreen> {
       _error = null;
     });
     try {
-      await FirebaseAuth.instance.createUserWithEmailAndPassword(
-        email: _emailController.text.trim(),
-        password: _passwordController.text.trim(),
-      );
+      final credential = await FirebaseAuth.instance
+          .createUserWithEmailAndPassword(
+            email: _emailController.text.trim(),
+            password: _passwordController.text.trim(),
+          );
+      final user = credential.user;
+      if (user != null) {
+        // Store username in Firestore
+        await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
+          'username': _usernameController.text.trim(),
+          'email': _emailController.text.trim(),
+        });
+        // Set displayName in Firebase Auth profile
+        await user.updateDisplayName(_usernameController.text.trim());
+      }
       if (!mounted) return;
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (context) => const HomePage()),
+        MaterialPageRoute(builder: (context) => LoginScreen()),
       );
     } on FirebaseAuthException catch (e) {
       setState(() {

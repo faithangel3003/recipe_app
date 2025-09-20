@@ -2,7 +2,7 @@ import 'package:final_proj/auth/signup.dart';
 import 'package:flutter/material.dart';
 
 import 'package:firebase_auth/firebase_auth.dart';
-import '../home.dart';
+import '../main_page.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -30,7 +30,7 @@ class _LoginScreenState extends State<LoginScreen> {
       if (!mounted) return;
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (context) => const HomePage()),
+        MaterialPageRoute(builder: (context) => MainPage()),
       );
     } on FirebaseAuthException catch (e) {
       setState(() {
@@ -147,7 +147,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   const Text("Don't have any account? "),
                   GestureDetector(
                     onTap: () {
-                      Navigator.push(
+                      Navigator.pushReplacement(
                         context,
                         MaterialPageRoute(
                           builder: (context) => const SignUpScreen(),

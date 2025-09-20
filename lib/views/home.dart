@@ -88,37 +88,6 @@ class HomePage extends StatelessWidget {
           ],
         ),
       ),
-
-      // Bottom Navigation
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: 0, // Home tab active
-        selectedItemColor: Colors.orange,
-        unselectedItemColor: Colors.grey,
-        onTap: (index) {
-          if (index == 0) {
-            Navigator.pushReplacementNamed(context, "/home");
-          } else if (index == 1) {
-            Navigator.pushReplacementNamed(context, "/upload");
-          } else if (index == 2) {
-            Navigator.pushReplacementNamed(context, "/notification");
-          } else if (index == 3) {
-            Navigator.pushReplacementNamed(context, "/profile");
-          }
-        },
-
-        items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.home), label: "Home"),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.cloud_upload),
-            label: "Upload",
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.notifications),
-            label: "Notification",
-          ),
-          BottomNavigationBarItem(icon: Icon(Icons.person), label: "Profile"),
-        ],
-      ),
     );
   }
 

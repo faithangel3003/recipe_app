@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class ProfilePage extends StatelessWidget {
-  const ProfilePage({super.key});
+  ProfilePage({Key? key}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
+    final user = FirebaseAuth.instance.currentUser;
     return Scaffold(
       appBar: AppBar(
         elevation: 0,
@@ -23,18 +25,18 @@ class ProfilePage extends StatelessWidget {
             const SizedBox(height: 10),
 
             // Profile Picture
-            const CircleAvatar(
+            CircleAvatar(
               radius: 50,
-              backgroundImage: NetworkImage(
-                "https://via.placeholder.com/150",
-              ), // temporary profile img
+              backgroundImage: user?.photoURL != null
+                  ? NetworkImage(user!.photoURL!)
+                  : const NetworkImage("https://via.placeholder.com/150"),
             ),
             const SizedBox(height: 10),
 
             // Name
-            const Text(
-              "Jared Busano",
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+            Text(
+              user?.displayName ?? "No Username",
+              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 10),
 
@@ -81,37 +83,11 @@ class ProfilePage extends StatelessWidget {
           ],
         ),
       ),
-
-      // Bottom Nav
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: 3, // Profile tab active
-        selectedItemColor: Colors.orange,
-        unselectedItemColor: Colors.grey,
-        onTap: (index) {
-          if (index == 0) {
-            Navigator.pushReplacementNamed(context, "/home");
-          } else if (index == 3) {
-            Navigator.pushReplacementNamed(context, "/profile");
-          }
-        },
-        items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.home), label: "Home"),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.cloud_upload),
-            label: "Upload",
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.notifications),
-            label: "Notification",
-          ),
-          BottomNavigationBarItem(icon: Icon(Icons.person), label: "Profile"),
-        ],
-      ),
     );
   }
 
   // Food Grid
-  static Widget _buildFoodGrid() {
+  Widget _buildFoodGrid() {
     final items = [
       {"name": "Pancake"},
       {"name": "Salad"},
