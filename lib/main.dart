@@ -1,8 +1,11 @@
 import 'package:final_proj/firebase_options.dart';
+import 'package:final_proj/home.dart';
+import 'package:final_proj/profile_page.dart';
+import 'package:final_proj/upload_page';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'onboarding.dart';
-import 'login.dart';
+import 'auth/login.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -20,7 +23,12 @@ class MyApp extends StatelessWidget {
       title: "Cooking App",
       theme: ThemeData(primarySwatch: Colors.deepOrange),
       home: const OnboardingScreen(),
-      routes: {'/login': (context) => const LoginScreen()},
+      routes: {
+        '/login': (context) => const LoginScreen(),
+        "/home": (context) => const HomePage(),
+        "/profile": (context) => const ProfilePage(),
+        "/upload": (context) => const UploadPage(),
+      },
     );
   }
 }
