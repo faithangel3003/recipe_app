@@ -1,6 +1,6 @@
 name: final_proj
 description: "A new Flutter project."
-publish_to: 'none' # Remove this line if you wish to publish to pub.dev
+publish_to: "none" # Remove this line if you wish to publish to pub.dev
 
 # Version and build number
 version: 1.0.0+1
@@ -14,6 +14,8 @@ dependencies:
 
   # Extra dependencies
   google_fonts: ^6.2.1
+  cloudinary_public: ^0.23.0
+  image_picker: ^1.1.2
   cupertino_icons: ^1.0.8
   firebase_core: ^4.1.0
   firebase_auth: ^6.0.2

@@ -1,4 +1,7 @@
+import 'package:final_proj/views/recipe_detail_page.dart';
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import '../model/recipe.dart';
 
 class HomePage extends StatelessWidget {
   const HomePage({super.key});
@@ -111,96 +114,115 @@ class HomePage extends StatelessWidget {
 
   // Food Grid
   static Widget _buildFoodGrid() {
-    final items = [
-      {"name": "Pancake", "author": "John Racil"},
-      {"name": "Salad", "author": "Faith Angel"},
-      {"name": "Burger", "author": "Keanu Justin"},
-      {"name": "Steak", "author": "Justin King"},
-    ];
-
-    return GridView.builder(
-      padding: const EdgeInsets.only(top: 10),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
-        childAspectRatio: 0.8,
-        crossAxisSpacing: 10,
-        mainAxisSpacing: 10,
-      ),
-      itemCount: items.length,
-      itemBuilder: (context, index) {
-        final item = items[index];
-        return Container(
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.05),
-                blurRadius: 5,
-                spreadRadius: 2,
-              ),
-            ],
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection('recipes')
+          .orderBy('createdAt', descending: true)
+          .snapshots(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+          return const Center(child: Text('No recipes found'));
+        }
+        final recipes = snapshot.data!.docs
+            .map((doc) => Recipe.fromJson(doc.data() as Map<String, dynamic>))
+            .toList();
+        return GridView.builder(
+          padding: const EdgeInsets.only(top: 10),
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 2,
+            childAspectRatio: 0.8,
+            crossAxisSpacing: 10,
+            mainAxisSpacing: 10,
           ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Fake image placeholder
-              Stack(
-                children: [
-                  ClipRRect(
-                    borderRadius: const BorderRadius.vertical(
-                      top: Radius.circular(16),
-                    ),
-                    child: Container(
-                      height: 100,
-                      color: Colors.grey.shade300,
-                      child: const Center(child: Icon(Icons.image, size: 40)),
-                    ),
+          itemCount: recipes.length,
+          itemBuilder: (context, index) {
+            final item = recipes[index];
+            return GestureDetector(
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => RecipeDetailPage(recipe: item),
                   ),
-                  const Positioned(
-                    right: 8,
-                    top: 8,
-                    child: CircleAvatar(
-                      backgroundColor: Colors.white,
-                      child: Icon(
-                        Icons.favorite_border,
-                        color: Colors.red,
-                        size: 20,
+                );
+              },
+
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Stack(
+                    children: [
+                      ClipRRect(
+                        borderRadius: const BorderRadius.vertical(
+                          top: Radius.circular(16),
+                        ),
+                        child: item.coverImageUrl.isNotEmpty
+                            ? Image.network(
+                                item.coverImageUrl,
+                                height: 100,
+                                width: double.infinity,
+                                fit: BoxFit.cover,
+                              )
+                            : Container(
+                                height: 100,
+                                color: Colors.grey.shade300,
+                                child: const Center(
+                                  child: Icon(Icons.image, size: 40),
+                                ),
+                              ),
                       ),
+                      const Positioned(
+                        right: 8,
+                        top: 8,
+                        child: CircleAvatar(
+                          backgroundColor: Colors.white,
+                          child: Icon(
+                            Icons.favorite_border,
+                            color: Colors.red,
+                            size: 20,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.all(8),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          item.authorName,
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          item.title,
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          '${item.category} • ${item.cookingDuration} mins',
+                          style: const TextStyle(
+                            color: Colors.grey,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ],
               ),
-              Padding(
-                padding: const EdgeInsets.all(8),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      item["author"]!,
-                      style: const TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      item["name"]!,
-                      style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    const Text(
-                      "Food • >60 mins",
-                      style: TextStyle(color: Colors.grey, fontSize: 12),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
+            );
+          },
         );
       },
     );

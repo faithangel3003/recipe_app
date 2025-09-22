@@ -1,0 +1,282 @@
+import 'package:flutter/material.dart';
+import '../model/recipe.dart';
+
+class UploadPage extends StatefulWidget {
+  const UploadPage({super.key});
+
+  @override
+  State<UploadPage> createState() => _UploadPageState();
+}
+
+class _UploadPageState extends State<UploadPage> {
+  int step = 1;
+
+  // Controllers
+  final TextEditingController foodNameController = TextEditingController();
+  final TextEditingController descriptionController = TextEditingController();
+  List<TextEditingController> stepControllers = [TextEditingController()];
+  List<ImageProvider?> stepImages = [null];
+
+  double cookingDuration = 30;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+          backgroundColor: Colors.white,
+          elevation: 0,
+          title: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              TextButton(
+                onPressed: () {
+                  Navigator.pushReplacementNamed(context, "/home");
+                },
+                child: const Text("Cancel", style: TextStyle(color: Colors.black)),
+              ),
+              Text(
+                "1/2",
+                style: TextStyle(color: Colors.black.withOpacity(0.6)),
+              ),
+            ],
+          ),
+      ),
+      body: step == 1 ? _buildStep1() : _buildStep2(),
+    );
+  }
+
+  // ---------------- STEP 1 ----------------
+  Widget _buildStep1() {
+    return SingleChildScrollView(
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Add Cover Photo
+            GestureDetector(
+              onTap: () {
+                // TODO: Pick image
+              },
+              child: Container(
+                height: 150,
+                decoration: BoxDecoration(
+                  border: Border.all(color: Colors.grey, style: BorderStyle.solid),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.image, size: 40, color: Colors.grey),
+                      Text("Add Cover Photo"),
+                      Text("(up to 12 Mb)",
+                          style: TextStyle(fontSize: 12, color: Colors.grey)),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 20),
+
+            // Food Name
+            const Text("Food Name", style: TextStyle(fontWeight: FontWeight.bold)),
+            TextField(
+              controller: foodNameController,
+              decoration: const InputDecoration(
+                hintText: "Enter food name",
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 20),
+
+            // Description
+            const Text("Description", style: TextStyle(fontWeight: FontWeight.bold)),
+            TextField(
+              controller: descriptionController,
+              maxLines: 3,
+              decoration: const InputDecoration(
+                hintText: "Tell a little about your food",
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 20),
+
+            // Cooking Duration
+            const Text("Cooking Duration (in minutes)",
+                style: TextStyle(fontWeight: FontWeight.bold)),
+            Slider(
+              value: cookingDuration,
+              min: 10,
+              max: 60,
+              divisions: 5,
+              activeColor: Colors.orange,
+              label: cookingDuration.round().toString(),
+              onChanged: (value) {
+                setState(() {
+                  cookingDuration = value;
+                });
+              },
+            ),
+            const SizedBox(height: 20),
+
+            // Next button
+            ElevatedButton(
+              onPressed: () {
+                setState(() => step = 2);
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.orange,
+                minimumSize: const Size(double.infinity, 50),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(30),
+                ),
+              ),
+              child: const Text("Next"),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ---------------- STEP 2 ----------------
+  Widget _buildStep2() {
+    return SingleChildScrollView(
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Ingredients Section
+            const Text("Ingredients", style: TextStyle(fontWeight: FontWeight.bold)),
+            const SizedBox(height: 10),
+            TextField(decoration: const InputDecoration(hintText: "Enter ingredient", border: OutlineInputBorder())),
+            const SizedBox(height: 10),
+            TextField(decoration: const InputDecoration(hintText: "Enter ingredient", border: OutlineInputBorder())),
+            const SizedBox(height: 10),
+            OutlinedButton.icon(
+              onPressed: () {
+                // TODO: Add more ingredients
+              },
+              icon: const Icon(Icons.add),
+              label: const Text("Ingredient"),
+            ),
+            const SizedBox(height: 20),
+
+            // Steps Section
+            const Text("Steps", style: TextStyle(fontWeight: FontWeight.bold)),
+            const SizedBox(height: 10),
+            ...List.generate(stepControllers.length, (index) => Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                TextField(
+                  controller: stepControllers[index],
+                  maxLines: 3,
+                  decoration: InputDecoration(
+                    hintText: "Describe step ${index + 1}",
+                    border: const OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                OutlinedButton.icon(
+                  onPressed: () {
+                    // TODO: Pick image for this step
+                  },
+                  icon: const Icon(Icons.camera_alt),
+                  label: const Text("Add Step Image"),
+                ),
+                const SizedBox(height: 10),
+              ],
+            )),
+            OutlinedButton.icon(
+              onPressed: () {
+                setState(() {
+                  stepControllers.add(TextEditingController());
+                  stepImages.add(null);
+                });
+              },
+              icon: const Icon(Icons.add),
+              label: const Text("Add More Steps"),
+            ),
+
+            const SizedBox(height: 20),
+
+            // Back + Upload Buttons
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () => setState(() => step = 1),
+                    style: OutlinedButton.styleFrom(
+                      minimumSize: const Size(double.infinity, 50),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(30),
+                      ),
+                    ),
+                    child: const Text("Back"),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: () {
+                      _showSuccessDialog();
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.orange,
+                      minimumSize: const Size(double.infinity, 50),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(30),
+                      ),
+                    ),
+                    child: const Text("Upload"),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ---------------- SUCCESS DIALOG ----------------
+  void _showSuccessDialog() {
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text("🎉", style: TextStyle(fontSize: 50)),
+            const SizedBox(height: 10),
+            const Text("Upload Success",
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 10),
+            const Text(
+              "Your recipe has been uploaded,\nyou can see it on your profile",
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 20),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.pop(context);
+                Navigator.pushReplacementNamed(context, "/home");
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.orange,
+                minimumSize: const Size(double.infinity, 50),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(30),
+                ),
+              ),
+              child: const Text("Back to Home"),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
