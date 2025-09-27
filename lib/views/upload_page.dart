@@ -1,4 +1,4 @@
-import 'dart:io';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -24,34 +24,74 @@ class _UploadPageState extends State<UploadPage> {
   ];
   final List<TextEditingController> stepControllers = [TextEditingController()];
 
-  // Images
-  File? coverImageFile;
-  List<File?> stepImageFiles = [null];
+  // Images - Use Uint8List for web compatibility
+  Uint8List? coverImageBytes;
+  List<Uint8List?> stepImageBytesList = <Uint8List?>[];
 
   double cookingDuration = 30;
-
   String selectedCategory = "Food";
 
   final ImagePicker _picker = ImagePicker();
   final CloudinaryService _cloudinary = CloudinaryService();
-
   bool _isUploading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // always at least one step field and one slot for image
+    if (stepControllers.isEmpty) {
+      stepControllers.add(TextEditingController());
+      stepImageBytesList.add(null);
+    }
+  }
 
   // ---------------- image pickers ----------------
   Future<void> pickCoverImage() async {
-    final XFile? x = await _picker.pickImage(
-      source: ImageSource.gallery,
-      imageQuality: 80,
-    );
-    if (x != null) setState(() => coverImageFile = File(x.path));
+    try {
+      final XFile? xFile = await _picker.pickImage(
+        source: ImageSource.gallery,
+        imageQuality: 80,
+      );
+
+      if (xFile != null) {
+        final bytes = await xFile.readAsBytes();
+        setState(() => coverImageBytes = bytes);
+      }
+    } catch (e) {
+      print('Error picking cover image: $e');
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error picking image: $e')));
+    }
   }
 
   Future<void> pickStepImage(int index) async {
-    final XFile? x = await _picker.pickImage(
-      source: ImageSource.gallery,
-      imageQuality: 80,
-    );
-    if (x != null) setState(() => stepImageFiles[index] = File(x.path));
+    try {
+      final XFile? xFile = await _picker.pickImage(
+        source: ImageSource.gallery,
+        imageQuality: 80,
+      );
+
+      if (xFile != null) {
+        final bytes = await xFile.readAsBytes();
+        setState(() {
+          if (index < stepImageBytesList.length) {
+            stepImageBytesList[index] = bytes;
+          } else {
+            // If the list is not long enough, add null entries until we reach the index
+            while (stepImageBytesList.length <= index) {
+              stepImageBytesList.add(null);
+            }
+            stepImageBytesList[index] = bytes;
+          }
+        });
+      }
+    } catch (e) {
+      print('Error picking step image: $e');
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error picking image: $e')));
+    }
   }
 
   // ---------------- add/remove fields ----------------
@@ -70,7 +110,7 @@ class _UploadPageState extends State<UploadPage> {
   void addStepField() {
     setState(() {
       stepControllers.add(TextEditingController());
-      stepImageFiles.add(null);
+      stepImageBytesList.add(null);
     });
   }
 
@@ -79,7 +119,7 @@ class _UploadPageState extends State<UploadPage> {
     setState(() {
       stepControllers[index].dispose();
       stepControllers.removeAt(index);
-      stepImageFiles.removeAt(index);
+      stepImageBytesList.removeAt(index);
     });
   }
 
@@ -98,7 +138,7 @@ class _UploadPageState extends State<UploadPage> {
       ).showSnackBar(const SnackBar(content: Text('Please enter a food name')));
       return;
     }
-    if (coverImageFile == null) {
+    if (coverImageBytes == null) {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(const SnackBar(content: Text('Please add a cover image')));
@@ -108,7 +148,7 @@ class _UploadPageState extends State<UploadPage> {
     setState(() => _isUploading = true);
 
     try {
-      // 1) get user profile (username, profileImageUrl)
+      // 1) Get user profile
       final userDoc = await FirebaseFirestore.instance
           .collection('users')
           .doc(user.uid)
@@ -118,9 +158,9 @@ class _UploadPageState extends State<UploadPage> {
           userData['username'] ?? user.email?.split('@')[0] ?? 'Unknown';
       final profileImageUrl = userData['profileImageUrl'] ?? '';
 
-      // 2) Upload cover image
-      final coverUrl = await _cloudinary.uploadFile(
-        coverImageFile!,
+      // 2) Upload cover image using bytes
+      final coverUrl = await _cloudinary.uploadImageBytes(
+        coverImageBytes!,
         folder: 'recipes/covers',
       );
 
@@ -128,9 +168,9 @@ class _UploadPageState extends State<UploadPage> {
       final List<RecipeStep> steps = [];
       for (int i = 0; i < stepControllers.length; i++) {
         String imageUrl = '';
-        if (stepImageFiles.length > i && stepImageFiles[i] != null) {
-          imageUrl = await _cloudinary.uploadFile(
-            stepImageFiles[i]!,
+        if (i < stepImageBytesList.length && stepImageBytesList[i] != null) {
+          imageUrl = await _cloudinary.uploadImageBytes(
+            stepImageBytesList[i]!,
             folder: 'recipes/steps',
           );
         }
@@ -142,13 +182,13 @@ class _UploadPageState extends State<UploadPage> {
         );
       }
 
-      // 4) Build ingredients list (non-empty)
+      // 4) Build ingredients list
       final ingredients = ingredientControllers
           .map((c) => c.text.trim())
           .where((s) => s.isNotEmpty)
           .toList();
 
-      // 5) create recipe id & object
+      // 5) Create recipe object
       final recipeId = FirebaseFirestore.instance
           .collection('recipes')
           .doc()
@@ -169,7 +209,7 @@ class _UploadPageState extends State<UploadPage> {
         createdAt: DateTime.now(),
       );
 
-      // 6) Write to Firestore (batch: create recipe doc + update user posts array)
+      // 6) Write to Firestore
       final batch = FirebaseFirestore.instance.batch();
       final recipeRef = FirebaseFirestore.instance
           .collection('recipes')
@@ -245,7 +285,7 @@ class _UploadPageState extends State<UploadPage> {
                 border: Border.all(color: Colors.grey),
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: coverImageFile == null
+              child: coverImageBytes == null
                   ? const Center(
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
@@ -261,15 +301,18 @@ class _UploadPageState extends State<UploadPage> {
                     )
                   : ClipRRect(
                       borderRadius: BorderRadius.circular(8),
-                      child: Image.file(
-                        coverImageFile!,
+                      child: Image.memory(
+                        coverImageBytes!,
                         fit: BoxFit.cover,
                         width: double.infinity,
+                        height: double.infinity,
                       ),
                     ),
             ),
           ),
           const SizedBox(height: 20),
+
+          // Rest of your step 1 UI remains the same...
           const Text(
             "Food Name",
             style: TextStyle(fontWeight: FontWeight.bold),
@@ -283,6 +326,9 @@ class _UploadPageState extends State<UploadPage> {
             ),
           ),
           const SizedBox(height: 16),
+
+          // ... (keep the rest of your step 1 UI exactly as it was)
+          // Only changed the image display part
           const Text(
             "Description",
             style: TextStyle(fontWeight: FontWeight.bold),
@@ -297,6 +343,7 @@ class _UploadPageState extends State<UploadPage> {
             ),
           ),
           const SizedBox(height: 16),
+
           const Text(
             "Cooking Duration (in minutes)",
             style: TextStyle(fontWeight: FontWeight.bold),
@@ -341,7 +388,6 @@ class _UploadPageState extends State<UploadPage> {
           ),
 
           const SizedBox(height: 20),
-          // Category
           const Text("Category", style: TextStyle(fontWeight: FontWeight.bold)),
           const SizedBox(height: 10),
           DropdownButtonFormField<String>(
@@ -439,12 +485,13 @@ class _UploadPageState extends State<UploadPage> {
                       label: const Text("Add Step Image"),
                     ),
                     const SizedBox(width: 8),
-                    if (stepImageFiles.length > i && stepImageFiles[i] != null)
+                    if (i < stepImageBytesList.length &&
+                        stepImageBytesList[i] != null)
                       SizedBox(
                         width: 60,
                         height: 60,
-                        child: Image.file(
-                          stepImageFiles[i]!,
+                        child: Image.memory(
+                          stepImageBytesList[i]!,
                           fit: BoxFit.cover,
                         ),
                       ),
@@ -528,7 +575,7 @@ class _UploadPageState extends State<UploadPage> {
             const SizedBox(height: 20),
             ElevatedButton(
               onPressed: () {
-                Navigator.pop(context); // close dialog
+                Navigator.pop(context);
                 Navigator.pushReplacementNamed(context, '/home');
               },
               style: ElevatedButton.styleFrom(

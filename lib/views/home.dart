@@ -121,6 +121,8 @@ class HomePage extends StatelessWidget {
       return const Center(child: Text('Please log in to like recipes.'));
     }
     final userId = user.uid;
+    final userName = user.displayName ?? "Unknown";
+    final userImage = user.photoURL ?? "";
 
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance
@@ -154,7 +156,12 @@ class HomePage extends StatelessWidget {
           itemCount: recipes.length,
           itemBuilder: (context, index) {
             final item = recipes[index];
-            return _FoodGridItem(item: item, userId: userId);
+            return _FoodGridItem(
+              item: item,
+              userId: userId,
+              userName: userName,
+              userImage: userImage,
+            );
           },
         );
       },
@@ -165,8 +172,15 @@ class HomePage extends StatelessWidget {
 class _FoodGridItem extends StatefulWidget {
   final Recipe item;
   final String userId;
-  const _FoodGridItem({required this.item, required this.userId, Key? key})
-    : super(key: key);
+  final String userName;
+  final String userImage;
+  const _FoodGridItem({
+    required this.item,
+    required this.userId,
+    required this.userName,
+    required this.userImage,
+    Key? key,
+  }) : super(key: key);
 
   @override
   State<_FoodGridItem> createState() => _FoodGridItemState();
@@ -206,7 +220,12 @@ class _FoodGridItemState extends State<_FoodGridItem> {
     });
 
     try {
-      await LikeService().toggleLike(widget.item.id, widget.userId);
+      await LikeService().toggleLike(
+        widget.item.id,
+        widget.userId,
+        widget.userName,
+        widget.userImage,
+      );
     } catch (e) {
       // Rollback on error
       setState(() {
