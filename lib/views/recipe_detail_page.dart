@@ -1,4 +1,6 @@
+import 'package:final_proj/services/follow_and_unfollow_services.dart';
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../model/recipe.dart';
 
 class RecipeDetailPage extends StatelessWidget {
@@ -8,10 +10,12 @@ class RecipeDetailPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final currentUid = FirebaseAuth.instance.currentUser!.uid;
+
     return Scaffold(
       body: CustomScrollView(
         slivers: [
-          // Cover image at the top
+          // Cover image
           SliverAppBar(
             expandedHeight: 250,
             floating: false,
@@ -57,7 +61,7 @@ class RecipeDetailPage extends StatelessWidget {
                   ),
                   const SizedBox(height: 16),
 
-                  // Author + likes
+                  // Author + likes + FOLLOW BUTTON
                   Row(
                     children: [
                       CircleAvatar(
@@ -74,13 +78,40 @@ class RecipeDetailPage extends StatelessWidget {
                         style: const TextStyle(fontWeight: FontWeight.bold),
                       ),
                       const Spacer(),
-                      Row(
-                        children: [
-                          const Icon(Icons.favorite, color: Colors.red),
-                          const SizedBox(width: 4),
-                          Text("${recipe.likes} Likes"),
-                        ],
-                      ),
+                      // FOLLOW BUTTON
+                      if (recipe.authorId != currentUid)
+                        ElevatedButton(
+                          onPressed: () async {
+                            await FollowService().toggleFollow(
+                              currentUid,
+                              recipe.authorId,
+                              FirebaseAuth.instance.currentUser!.displayName ??
+                                  "User",
+                              FirebaseAuth.instance.currentUser!.photoURL ?? "",
+                            );
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.green,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 8,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                          ),
+                          child: const Text("Follow"),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 20),
+
+                  // Likes row
+                  Row(
+                    children: [
+                      const Icon(Icons.favorite, color: Colors.red),
+                      const SizedBox(width: 4),
+                      Text("${recipe.likes} Likes"),
                     ],
                   ),
                   const SizedBox(height: 20),

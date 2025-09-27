@@ -3,8 +3,10 @@ class AppUser {
   final String username;
   final String email;
   final String profileImageUrl;
-  final List<String> posts; // recipe ids
+  final List<String> posts;
   final List<String> likedPosts;
+  final List<String> followers;
+  final List<String> following;
 
   AppUser({
     required this.uid,
@@ -13,6 +15,8 @@ class AppUser {
     required this.profileImageUrl,
     required this.posts,
     required this.likedPosts,
+    required this.followers,
+    required this.following,
   });
 
   Map<String, dynamic> toJson() => {
@@ -22,6 +26,8 @@ class AppUser {
     "profileImageUrl": profileImageUrl,
     "posts": posts,
     "likedPosts": likedPosts,
+    "followers": followers,
+    "following": following,
   };
 
   static AppUser fromJson(Map<String, dynamic> json) => AppUser(
@@ -31,5 +37,7 @@ class AppUser {
     profileImageUrl: json["profileImageUrl"],
     posts: List<String>.from(json["posts"] ?? []),
     likedPosts: List<String>.from(json["likedPosts"] ?? []),
+    followers: List<String>.from(json["followers"] ?? []),
+    following: List<String>.from(json["following"] ?? []),
   );
 }

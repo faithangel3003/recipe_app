@@ -1,9 +1,8 @@
 import 'package:final_proj/views/notification_page.dart';
 
 import 'views/home.dart';
-import 'views/upload_page';
+import 'views/upload_page.dart';
 import 'package:flutter/material.dart';
-
 import 'views/profile_page.dart';
 
 class MainPage extends StatefulWidget {
