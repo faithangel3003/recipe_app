@@ -21,7 +21,25 @@ class _ProfilePageState extends State<ProfilePage> {
   Widget build(BuildContext context) {
     final user = FirebaseAuth.instance.currentUser;
     return Scaffold(
-      appBar: AppBar(title: const Text("Profile")),
+      appBar: AppBar(
+        title: const Text("Profile"),
+        actions: [
+          PopupMenuButton<String>(
+            onSelected: (value) async {
+              if (value == 'logout') {
+                await FirebaseAuth.instance.signOut();
+                if (mounted) {
+                  Navigator.of(context).pushReplacementNamed("/login");
+                }
+              }
+            },
+            itemBuilder: (context) => [
+              const PopupMenuItem(value: 'logout', child: Text("Log Out")),
+            ],
+            icon: const Icon(Icons.more_vert),
+          ),
+        ],
+      ),
       body: SingleChildScrollView(
         child: Column(
           children: [
@@ -120,7 +138,24 @@ class _ProfilePageState extends State<ProfilePage> {
               style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 5),
-            const Text("Recipes • Following • Followers"),
+            StreamBuilder<DocumentSnapshot>(
+              stream: FirebaseFirestore.instance
+                  .collection('users')
+                  .doc(user?.uid)
+                  .snapshots(),
+              builder: (context, snapshot) {
+                if (!snapshot.hasData || !snapshot.data!.exists) {
+                  return const Text("Followers: 0 • Following: 0");
+                }
+                final data =
+                    snapshot.data!.data() as Map<String, dynamic>? ?? {};
+                final followers =
+                    (data['followers'] as List<dynamic>? ?? []).length;
+                final following =
+                    (data['following'] as List<dynamic>? ?? []).length;
+                return Text("Followers: $followers • Following: $following");
+              },
+            ),
             const SizedBox(height: 20),
             // Tab bar
             Row(
@@ -353,6 +388,113 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 
   Widget _buildLikedGrid() {
-    return const Center(child: Text("Liked recipes will appear here"));
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      return const Center(child: Text("Please log in to see liked recipes"));
+    }
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection('recipes')
+          .where('likedBy', arrayContains: user.uid)
+          .snapshots(),
+      builder: (context, snapshot) {
+        if (snapshot.hasError) {
+          return const Center(child: Text("Error loading liked recipes"));
+        }
+        if (!snapshot.hasData) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        final docs = snapshot.data!.docs;
+        if (docs.isEmpty) {
+          return const Center(child: Text("No liked recipes yet"));
+        }
+        return GridView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          padding: const EdgeInsets.all(10),
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 2,
+            crossAxisSpacing: 12,
+            mainAxisSpacing: 12,
+            childAspectRatio: 0.75,
+          ),
+          itemCount: docs.length,
+          itemBuilder: (context, index) {
+            final data = docs[index].data() as Map<String, dynamic>;
+            return Container(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.05),
+                    blurRadius: 5,
+                    spreadRadius: 2,
+                  ),
+                ],
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  ClipRRect(
+                    borderRadius: const BorderRadius.vertical(
+                      top: Radius.circular(16),
+                    ),
+                    child:
+                        data['coverImageUrl'] != null &&
+                            data['coverImageUrl'].toString().isNotEmpty
+                        ? Image.network(
+                            data['coverImageUrl'],
+                            height: 100,
+                            width: double.infinity,
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) =>
+                                Container(
+                                  height: 100,
+                                  color: Colors.grey.shade300,
+                                  child: const Center(
+                                    child: Icon(Icons.broken_image, size: 40),
+                                  ),
+                                ),
+                          )
+                        : Container(
+                            height: 100,
+                            color: Colors.grey.shade300,
+                            child: const Center(
+                              child: Icon(Icons.image, size: 40),
+                            ),
+                          ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.all(8),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          data['title'] ?? '',
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          "${data['category'] ?? 'Food'} • ${data['cookingDuration'] ?? ''} mins",
+                          style: const TextStyle(
+                            color: Colors.grey,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
   }
 }
