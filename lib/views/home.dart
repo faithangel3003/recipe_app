@@ -1,4 +1,6 @@
+import 'package:final_proj/services/like_services.dart';
 import 'package:final_proj/views/recipe_detail_page.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../model/recipe.dart';
@@ -114,6 +116,14 @@ class HomePage extends StatelessWidget {
 
   // Food Grid
   static Widget _buildFoodGrid() {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      return const Center(child: Text('Please log in to like recipes.'));
+    }
+    final userId = user.uid;
+    final userName = user.displayName ?? "Unknown";
+    final userImage = user.photoURL ?? "";
+
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance
           .collection('recipes')
@@ -123,12 +133,18 @@ class HomePage extends StatelessWidget {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator());
         }
+        if (snapshot.hasError) {
+          return Center(child: Text('Error: ${snapshot.error}'));
+        }
         if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
           return const Center(child: Text('No recipes found'));
         }
-        final recipes = snapshot.data!.docs
-            .map((doc) => Recipe.fromJson(doc.data() as Map<String, dynamic>))
-            .toList();
+
+        final recipes = snapshot.data!.docs.map((doc) {
+          final data = doc.data() as Map<String, dynamic>;
+          return Recipe.fromJson(data);
+        }).toList();
+
         return GridView.builder(
           padding: const EdgeInsets.only(top: 10),
           gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
@@ -140,91 +156,208 @@ class HomePage extends StatelessWidget {
           itemCount: recipes.length,
           itemBuilder: (context, index) {
             final item = recipes[index];
-            return GestureDetector(
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => RecipeDetailPage(recipe: item),
-                  ),
-                );
-              },
-
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Stack(
-                    children: [
-                      ClipRRect(
-                        borderRadius: const BorderRadius.vertical(
-                          top: Radius.circular(16),
-                        ),
-                        child: item.coverImageUrl.isNotEmpty
-                            ? Image.network(
-                                item.coverImageUrl,
-                                height: 100,
-                                width: double.infinity,
-                                fit: BoxFit.cover,
-                              )
-                            : Container(
-                                height: 100,
-                                color: Colors.grey.shade300,
-                                child: const Center(
-                                  child: Icon(Icons.image, size: 40),
-                                ),
-                              ),
-                      ),
-                      const Positioned(
-                        right: 8,
-                        top: 8,
-                        child: CircleAvatar(
-                          backgroundColor: Colors.white,
-                          child: Icon(
-                            Icons.favorite_border,
-                            color: Colors.red,
-                            size: 20,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.all(8),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          item.authorName,
-                          style: const TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          item.title,
-                          style: const TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          '${item.category} • ${item.cookingDuration} mins',
-                          style: const TextStyle(
-                            color: Colors.grey,
-                            fontSize: 12,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
+            return _FoodGridItem(
+              item: item,
+              userId: userId,
+              userName: userName,
+              userImage: userImage,
             );
           },
         );
       },
+    );
+  }
+}
+
+class _FoodGridItem extends StatefulWidget {
+  final Recipe item;
+  final String userId;
+  final String userName;
+  final String userImage;
+  const _FoodGridItem({
+    required this.item,
+    required this.userId,
+    required this.userName,
+    required this.userImage,
+    Key? key,
+  }) : super(key: key);
+
+  @override
+  State<_FoodGridItem> createState() => _FoodGridItemState();
+}
+
+class _FoodGridItemState extends State<_FoodGridItem> {
+  late bool _isLiked;
+  late int _likesCount;
+  bool _isLoading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _isLiked = widget.item.likedBy.contains(widget.userId);
+    _likesCount = widget.item.likes;
+  }
+
+  Future<void> _handleLike() async {
+    if (_isLoading) return;
+
+    setState(() {
+      _isLoading = true;
+    });
+
+    // Store original values for rollback
+    final bool originalIsLiked = _isLiked;
+    final int originalLikesCount = _likesCount;
+
+    // Optimistic update
+    setState(() {
+      if (_isLiked) {
+        _likesCount--;
+      } else {
+        _likesCount++;
+      }
+      _isLiked = !_isLiked;
+    });
+
+    try {
+      await LikeService().toggleLike(
+        widget.item.id,
+        widget.userId,
+        widget.userName,
+        widget.userImage,
+      );
+    } catch (e) {
+      // Rollback on error
+      setState(() {
+        _isLiked = originalIsLiked;
+        _likesCount = originalLikesCount;
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to update like: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final item = widget.item;
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => RecipeDetailPage(recipe: item)),
+        );
+      },
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Stack(
+            children: [
+              ClipRRect(
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(16),
+                ),
+                child: item.coverImageUrl.isNotEmpty
+                    ? Image.network(
+                        item.coverImageUrl,
+                        height: 100,
+                        width: double.infinity,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) {
+                          return Container(
+                            height: 100,
+                            color: Colors.grey.shade300,
+                            child: const Center(
+                              child: Icon(Icons.broken_image, size: 40),
+                            ),
+                          );
+                        },
+                      )
+                    : Container(
+                        height: 100,
+                        color: Colors.grey.shade300,
+                        child: const Center(child: Icon(Icons.image, size: 40)),
+                      ),
+              ),
+              Positioned(
+                right: 8,
+                top: 8,
+                child: GestureDetector(
+                  onTap: _handleLike,
+                  child: CircleAvatar(
+                    backgroundColor: Colors.white.withOpacity(0.9),
+                    radius: 16,
+                    child: _isLoading
+                        ? const SizedBox(
+                            width: 12,
+                            height: 12,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : Icon(
+                            _isLiked ? Icons.favorite : Icons.favorite_border,
+                            color: _isLiked ? Colors.red : Colors.grey,
+                            size: 18,
+                          ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          Padding(
+            padding: const EdgeInsets.all(8),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  item.authorName,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  item.title,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  '${item.category} • ${item.cookingDuration} mins',
+                  style: const TextStyle(color: Colors.grey, fontSize: 12),
+                ),
+                const SizedBox(height: 4),
+                Row(
+                  children: [
+                    const Icon(Icons.favorite, color: Colors.red, size: 16),
+                    const SizedBox(width: 4),
+                    Text(
+                      '$_likesCount likes',
+                      style: const TextStyle(fontSize: 12),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

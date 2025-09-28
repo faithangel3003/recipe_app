@@ -1,3 +1,5 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+
 class RecipeStep {
   final String description;
   final String imageUrl;
@@ -16,7 +18,6 @@ class RecipeStep {
 }
 
 class Recipe {
-  // Removed duplicate toJson()
   final String id;
   final String authorId;
   final String authorName;
@@ -28,9 +29,10 @@ class Recipe {
   final List<RecipeStep> steps;
   final int cookingDuration;
   final String category;
-
-  final int likes;
+  final List<String> likedBy;
   final DateTime createdAt;
+
+  int get likes => likedBy.length;
 
   Recipe({
     required this.id,
@@ -44,7 +46,7 @@ class Recipe {
     required this.steps,
     required this.cookingDuration,
     required this.category,
-    required this.likes,
+    required this.likedBy,
     required this.createdAt,
   });
 
@@ -60,27 +62,53 @@ class Recipe {
     'steps': steps.map((s) => s.toJson()).toList(),
     'cookingDuration': cookingDuration,
     'category': category,
-    'likes': likes,
-    'createdAt': createdAt.toIso8601String(),
+    'likedBy': likedBy,
+    'createdAt': createdAt.toIso8601String(), // Store as ISO string
   };
 
-  factory Recipe.fromJson(Map<String, dynamic> json) => Recipe(
-    id: json['id'] ?? '',
-    authorId: json['authorId'] ?? '',
-    authorName: json['authorName'] ?? '',
-    authorProfileImage: json['authorProfileImage'] ?? '',
-    coverImageUrl: json['coverImageUrl'] ?? '',
-    title: json['title'] ?? '',
-    description: json['description'] ?? '',
-    ingredients: List<String>.from(json['ingredients'] ?? []),
-    steps: (json['steps'] as List<dynamic>? ?? [])
-        .map((s) => RecipeStep.fromJson(s))
-        .toList(),
-    cookingDuration: json['cookingDuration'] ?? 0,
-    likes: json['likes'] ?? 0,
-    createdAt: DateTime.parse(
-      json['createdAt'] ?? DateTime.now().toIso8601String(),
-    ),
-    category: json['category'] ?? 'Food',
-  );
+  factory Recipe.fromJson(Map<String, dynamic> json) {
+    // Handle createdAt field - it could be string (ISO) or timestamp
+    DateTime parseCreatedAt(dynamic createdAtValue) {
+      if (createdAtValue == null) return DateTime.now();
+
+      if (createdAtValue is String) {
+        // Try parsing as ISO string
+        return DateTime.tryParse(createdAtValue) ?? DateTime.now();
+      } else if (createdAtValue is num) {
+        // Handle timestamp (milliseconds or seconds)
+        return DateTime.fromMillisecondsSinceEpoch(
+          createdAtValue is int
+              ? createdAtValue
+              : createdAtValue.toInt() * 1000,
+        );
+      } else if (createdAtValue is Timestamp) {
+        // Handle Firestore Timestamp
+        return createdAtValue.toDate();
+      }
+
+      return DateTime.now();
+    }
+
+    return Recipe(
+      id: json['id']?.toString() ?? '',
+      authorId: json['authorId']?.toString() ?? '',
+      authorName: json['authorName']?.toString() ?? '',
+      authorProfileImage: json['authorProfileImage']?.toString() ?? '',
+      coverImageUrl: json['coverImageUrl']?.toString() ?? '',
+      title: json['title']?.toString() ?? '',
+      description: json['description']?.toString() ?? '',
+      ingredients: List<String>.from(json['ingredients'] ?? []),
+      steps: (json['steps'] as List<dynamic>? ?? [])
+          .map(
+            (s) => RecipeStep.fromJson(
+              s is Map<String, dynamic> ? s : Map<String, dynamic>.from(s),
+            ),
+          )
+          .toList(),
+      cookingDuration: (json['cookingDuration'] as num?)?.toInt() ?? 0,
+      category: json['category']?.toString() ?? 'Food',
+      likedBy: List<String>.from(json['likedBy'] ?? []),
+      createdAt: parseCreatedAt(json['createdAt']),
+    );
+  }
 }
