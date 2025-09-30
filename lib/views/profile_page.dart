@@ -2,6 +2,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import '../model/recipe.dart';
+import 'recipe_detail_page.dart';
 import 'dart:io';
 import '../services/cloudinary_service.dart';
 
@@ -230,26 +232,23 @@ class _ProfilePageState extends State<ProfilePage> {
           padding: const EdgeInsets.all(10),
           gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: 2,
-            crossAxisSpacing: 12,
-            mainAxisSpacing: 12,
-            childAspectRatio: 0.75,
+            crossAxisSpacing: 10,
+            mainAxisSpacing: 10,
+            childAspectRatio: 0.8,
           ),
           itemCount: docs.length,
           itemBuilder: (context, index) {
             final data = docs[index].data() as Map<String, dynamic>;
-            final docId = docs[index].id;
-            return Container(
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.05),
-                    blurRadius: 5,
-                    spreadRadius: 2,
+            final recipe = Recipe.fromJson(data);
+            return GestureDetector(
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => RecipeDetailPage(recipe: recipe),
                   ),
-                ],
-              ),
+                );
+              },
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -259,25 +258,21 @@ class _ProfilePageState extends State<ProfilePage> {
                         borderRadius: const BorderRadius.vertical(
                           top: Radius.circular(16),
                         ),
-                        child:
-                            data['coverImageUrl'] != null &&
-                                data['coverImageUrl'].toString().isNotEmpty
+                        child: recipe.coverImageUrl.isNotEmpty
                             ? Image.network(
-                                data['coverImageUrl'],
+                                recipe.coverImageUrl,
                                 height: 100,
                                 width: double.infinity,
                                 fit: BoxFit.cover,
-                                errorBuilder: (context, error, stackTrace) =>
-                                    Container(
-                                      height: 100,
-                                      color: Colors.grey.shade300,
-                                      child: const Center(
-                                        child: Icon(
-                                          Icons.broken_image,
-                                          size: 40,
-                                        ),
-                                      ),
+                                errorBuilder: (context, error, stackTrace) {
+                                  return Container(
+                                    height: 100,
+                                    color: Colors.grey.shade300,
+                                    child: const Center(
+                                      child: Icon(Icons.broken_image, size: 40),
                                     ),
+                                  );
+                                },
                               )
                             : Container(
                                 height: 100,
@@ -290,49 +285,58 @@ class _ProfilePageState extends State<ProfilePage> {
                       Positioned(
                         right: 8,
                         top: 8,
-                        child: PopupMenuButton<String>(
-                          icon: const Icon(
-                            Icons.more_vert,
-                            color: Colors.black87,
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: Colors.deepOrange,
+                            shape: BoxShape.circle,
                           ),
-                          onSelected: (value) async {
-                            if (value == 'edit') {
-                              final result = await Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) => EditRecipePage(
-                                    recipeId: docId,
-                                    recipeData: data,
+                          child: PopupMenuButton<String>(
+                            icon: const Icon(
+                              Icons.more_vert,
+                              color: Colors.white,
+                              size: 28,
+                            ),
+                            onSelected: (value) async {
+                              if (value == 'edit') {
+                                final result = await Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => EditRecipePage(
+                                      recipeId: docs[index].id,
+                                      recipeData: data,
+                                    ),
                                   ),
-                                ),
-                              );
-                              if (result == true) {
+                                );
+                                if (result == true) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text('Recipe updated'),
+                                    ),
+                                  );
+                                }
+                              } else if (value == 'delete') {
+                                await FirebaseFirestore.instance
+                                    .collection('recipes')
+                                    .doc(docs[index].id)
+                                    .delete();
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   const SnackBar(
-                                    content: Text('Recipe updated'),
+                                    content: Text('Recipe deleted'),
                                   ),
                                 );
                               }
-                            } else if (value == 'delete') {
-                              await FirebaseFirestore.instance
-                                  .collection('recipes')
-                                  .doc(docId)
-                                  .delete();
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('Recipe deleted')),
-                              );
-                            }
-                          },
-                          itemBuilder: (context) => [
-                            const PopupMenuItem(
-                              value: 'edit',
-                              child: Text('Edit'),
-                            ),
-                            const PopupMenuItem(
-                              value: 'delete',
-                              child: Text('Delete'),
-                            ),
-                          ],
+                            },
+                            itemBuilder: (context) => [
+                              const PopupMenuItem(
+                                value: 'edit',
+                                child: Text('Edit'),
+                              ),
+                              const PopupMenuItem(
+                                value: 'delete',
+                                child: Text('Delete'),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                     ],
@@ -342,38 +346,45 @@ class _ProfilePageState extends State<ProfilePage> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Expanded(
-                              child: Text(
-                                data['title'] ?? '',
-                                style: const TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                            IconButton(
-                              icon: const Icon(
-                                Icons.favorite_border,
-                                color: Colors.red,
-                                size: 20,
-                              ),
-                              onPressed: () {
-                                // TODO: Handle like
-                              },
-                            ),
-                          ],
+                        Text(
+                          recipe.authorName,
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                          ),
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          "${data['category'] ?? 'Food'} • ${data['cookingDuration'] ?? ''} mins",
+                          recipe.title,
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          '${recipe.category} • ${recipe.cookingDuration} mins',
                           style: const TextStyle(
                             color: Colors.grey,
                             fontSize: 12,
                           ),
+                        ),
+                        const SizedBox(height: 4),
+                        Row(
+                          children: [
+                            const Icon(
+                              Icons.favorite,
+                              color: Colors.red,
+                              size: 16,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              '${recipe.likes} likes',
+                              style: const TextStyle(fontSize: 12),
+                            ),
+                          ],
                         ),
                       ],
                     ),
@@ -414,56 +425,57 @@ class _ProfilePageState extends State<ProfilePage> {
           padding: const EdgeInsets.all(10),
           gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: 2,
-            crossAxisSpacing: 12,
-            mainAxisSpacing: 12,
-            childAspectRatio: 0.75,
+            crossAxisSpacing: 10,
+            mainAxisSpacing: 10,
+            childAspectRatio: 0.8,
           ),
           itemCount: docs.length,
           itemBuilder: (context, index) {
             final data = docs[index].data() as Map<String, dynamic>;
-            return Container(
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.05),
-                    blurRadius: 5,
-                    spreadRadius: 2,
+            final recipe = Recipe.fromJson(data);
+            return GestureDetector(
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => RecipeDetailPage(recipe: recipe),
                   ),
-                ],
-              ),
+                );
+              },
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  ClipRRect(
-                    borderRadius: const BorderRadius.vertical(
-                      top: Radius.circular(16),
-                    ),
-                    child:
-                        data['coverImageUrl'] != null &&
-                            data['coverImageUrl'].toString().isNotEmpty
-                        ? Image.network(
-                            data['coverImageUrl'],
-                            height: 100,
-                            width: double.infinity,
-                            fit: BoxFit.cover,
-                            errorBuilder: (context, error, stackTrace) =>
-                                Container(
-                                  height: 100,
-                                  color: Colors.grey.shade300,
-                                  child: const Center(
-                                    child: Icon(Icons.broken_image, size: 40),
-                                  ),
+                  Stack(
+                    children: [
+                      ClipRRect(
+                        borderRadius: const BorderRadius.vertical(
+                          top: Radius.circular(16),
+                        ),
+                        child: recipe.coverImageUrl.isNotEmpty
+                            ? Image.network(
+                                recipe.coverImageUrl,
+                                height: 100,
+                                width: double.infinity,
+                                fit: BoxFit.cover,
+                                errorBuilder: (context, error, stackTrace) {
+                                  return Container(
+                                    height: 100,
+                                    color: Colors.grey.shade300,
+                                    child: const Center(
+                                      child: Icon(Icons.broken_image, size: 40),
+                                    ),
+                                  );
+                                },
+                              )
+                            : Container(
+                                height: 100,
+                                color: Colors.grey.shade300,
+                                child: const Center(
+                                  child: Icon(Icons.image, size: 40),
                                 ),
-                          )
-                        : Container(
-                            height: 100,
-                            color: Colors.grey.shade300,
-                            child: const Center(
-                              child: Icon(Icons.image, size: 40),
-                            ),
-                          ),
+                              ),
+                      ),
+                    ],
                   ),
                   Padding(
                     padding: const EdgeInsets.all(8),
@@ -471,20 +483,44 @@ class _ProfilePageState extends State<ProfilePage> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          data['title'] ?? '',
+                          recipe.authorName,
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          recipe.title,
                           style: const TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.bold,
                           ),
+                          maxLines: 2,
                           overflow: TextOverflow.ellipsis,
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          "${data['category'] ?? 'Food'} • ${data['cookingDuration'] ?? ''} mins",
+                          '${recipe.category} • ${recipe.cookingDuration} mins',
                           style: const TextStyle(
                             color: Colors.grey,
                             fontSize: 12,
                           ),
+                        ),
+                        const SizedBox(height: 4),
+                        Row(
+                          children: [
+                            const Icon(
+                              Icons.favorite,
+                              color: Colors.red,
+                              size: 16,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              '${recipe.likes} likes',
+                              style: const TextStyle(fontSize: 12),
+                            ),
+                          ],
                         ),
                       ],
                     ),

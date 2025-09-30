@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../model/recipe.dart';
 import 'dart:io';
 import 'package:image_picker/image_picker.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import '../services/cloudinary_service.dart';
 
 class EditRecipePage extends StatefulWidget {
@@ -219,11 +220,17 @@ class _EditRecipePageState extends State<EditRecipePage> {
                     child: coverImageFile != null
                         ? ClipRRect(
                             borderRadius: BorderRadius.circular(8),
-                            child: Image.file(
-                              coverImageFile!,
-                              fit: BoxFit.cover,
-                              width: double.infinity,
-                            ),
+                            child: kIsWeb
+                                ? Image.network(
+                                    coverImageUrl ?? '',
+                                    fit: BoxFit.cover,
+                                    width: double.infinity,
+                                  )
+                                : Image.file(
+                                    coverImageFile!,
+                                    fit: BoxFit.cover,
+                                    width: double.infinity,
+                                  ),
                           )
                         : (coverImageUrl != null && coverImageUrl!.isNotEmpty)
                         ? ClipRRect(
@@ -417,10 +424,19 @@ class _EditRecipePageState extends State<EditRecipePage> {
                                 SizedBox(
                                   width: 60,
                                   height: 60,
-                                  child: Image.file(
-                                    stepImageFiles[i]!,
-                                    fit: BoxFit.cover,
-                                  ),
+                                  child: kIsWeb
+                                      ? (stepImageUrls.length > i &&
+                                                stepImageUrls[i] != null &&
+                                                stepImageUrls[i]!.isNotEmpty
+                                            ? Image.network(
+                                                stepImageUrls[i]!,
+                                                fit: BoxFit.cover,
+                                              )
+                                            : const Icon(Icons.image))
+                                      : Image.file(
+                                          stepImageFiles[i]!,
+                                          fit: BoxFit.cover,
+                                        ),
                                 ),
                                 Positioned(
                                   right: 0,

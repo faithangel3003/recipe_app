@@ -22,8 +22,8 @@ class LikeService {
       bool isCurrentlyLiked = likedBy.contains(userId);
       final authorId = data['authorId'] as String?;
       final recipeTitle = data['title'] ?? "Untitled";
-      final recipeImage =
-          data['thumbnail'] ?? ""; // Assuming you store recipe thumbnails
+      // Try coverImageUrl first, fallback to thumbnail
+      final recipeImage = data['coverImageUrl'] ?? data['thumbnail'] ?? "";
 
       if (isCurrentlyLiked) {
         await recipeRef.update({
