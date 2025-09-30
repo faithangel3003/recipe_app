@@ -1,5 +1,6 @@
 import 'package:final_proj/services/like_services.dart';
 import 'package:final_proj/views/recipe_detail_page.dart';
+import 'package:final_proj/views/search_page.dart'; // ✅ import search page
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -22,26 +23,35 @@ class HomePage extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Search Bar
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              decoration: BoxDecoration(
-                color: Colors.grey.shade200,
-                borderRadius: BorderRadius.circular(25),
-              ),
-              child: const Row(
-                children: [
-                  Icon(Icons.search, color: Colors.grey),
-                  SizedBox(width: 8),
-                  Expanded(
-                    child: TextField(
-                      decoration: InputDecoration(
-                        hintText: "Search",
-                        border: InputBorder.none,
-                      ),
-                    ),
+            // 🔎 Search Bar → navigates to SearchPage
+            GestureDetector(
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const SearchPage(userId: ''),
                   ),
-                ],
+                );
+              },
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade200,
+                  borderRadius: BorderRadius.circular(25),
+                ),
+                child: const Row(
+                  children: [
+                    Icon(Icons.search, color: Colors.grey),
+                    SizedBox(width: 8),
+                    Text(
+                      "Search",
+                      style: TextStyle(color: Colors.grey, fontSize: 16),
+                    ),
+                  ],
+                ),
               ),
             ),
             const SizedBox(height: 20),
@@ -169,6 +179,7 @@ class HomePage extends StatelessWidget {
   }
 }
 
+// 🔥 Food Item Card
 class _FoodGridItem extends StatefulWidget {
   final Recipe item;
   final String userId;
@@ -205,11 +216,9 @@ class _FoodGridItemState extends State<_FoodGridItem> {
       _isLoading = true;
     });
 
-    // Store original values for rollback
     final bool originalIsLiked = _isLiked;
     final int originalLikesCount = _likesCount;
 
-    // Optimistic update
     setState(() {
       if (_isLiked) {
         _likesCount--;
@@ -227,7 +236,6 @@ class _FoodGridItemState extends State<_FoodGridItem> {
         widget.userImage,
       );
     } catch (e) {
-      // Rollback on error
       setState(() {
         _isLiked = originalIsLiked;
         _likesCount = originalLikesCount;
