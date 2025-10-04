@@ -114,8 +114,9 @@ class _ProfilePageState extends State<ProfilePage> {
               style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 15),
-            // Stats row
-            StreamBuilder<DocumentSnapshot>(
+            // Stats row: user doc stream to show follower/following counts and
+            // nested stream to count recipes authored by the current user.
+            StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
               stream: FirebaseFirestore.instance
                   .collection('users')
                   .doc(user?.uid)
@@ -124,13 +125,25 @@ class _ProfilePageState extends State<ProfilePage> {
                 if (!snapshot.hasData || !snapshot.data!.exists) {
                   return _buildStats(0, 0, 0);
                 }
-                final data =
-                    snapshot.data!.data() as Map<String, dynamic>? ?? {};
+                final data = snapshot.data!.data() ?? <String, dynamic>{};
                 final followers =
                     (data['followers'] as List<dynamic>? ?? []).length;
                 final following =
                     (data['following'] as List<dynamic>? ?? []).length;
-                return _buildStats(0, following, followers);
+
+                // Nested stream to count recipes authored by this user
+                return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                  stream: FirebaseFirestore.instance
+                      .collection('recipes')
+                      .where('authorId', isEqualTo: user?.uid)
+                      .snapshots(),
+                  builder: (context, recipesSnap) {
+                    final recipesCount = recipesSnap.hasData
+                        ? recipesSnap.data!.docs.length
+                        : 0;
+                    return _buildStats(recipesCount, following, followers);
+                  },
+                );
               },
             ),
             const SizedBox(height: 20),
@@ -170,7 +183,6 @@ class _ProfilePageState extends State<ProfilePage> {
                 MaterialPageRoute(
                   builder: (_) => FollowListPage(
                     userId: FirebaseAuth.instance.currentUser!.uid,
-                    type: 'following',
                   ),
                 ),
               );
@@ -187,7 +199,6 @@ class _ProfilePageState extends State<ProfilePage> {
                 MaterialPageRoute(
                   builder: (_) => FollowListPage(
                     userId: FirebaseAuth.instance.currentUser!.uid,
-                    type: 'followers',
                   ),
                 ),
               );

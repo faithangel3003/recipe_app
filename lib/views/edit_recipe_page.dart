@@ -24,7 +24,7 @@ class _EditRecipePageState extends State<EditRecipePage> {
   final ImagePicker _picker = ImagePicker();
   final CloudinaryService _cloudinary = CloudinaryService();
 
-  File? coverImageFile;
+  XFile? coverImageXFile; // ✅ use XFile instead of File
   String? coverImageUrl;
 
   late TextEditingController foodNameController;
@@ -79,7 +79,11 @@ class _EditRecipePageState extends State<EditRecipePage> {
       source: ImageSource.gallery,
       imageQuality: 80,
     );
-    if (x != null) setState(() => coverImageFile = File(x.path));
+    if (x != null) {
+      setState(() {
+        coverImageXFile = x; // ✅ update XFile instead of File
+      });
+    }
   }
 
   Future<void> pickStepImage(int index) async {
@@ -125,9 +129,9 @@ class _EditRecipePageState extends State<EditRecipePage> {
     try {
       // Cover image
       String newCoverUrl = coverImageUrl ?? '';
-      if (coverImageFile != null) {
+      if (coverImageXFile != null) {
         newCoverUrl = await _cloudinary.uploadFile(
-          coverImageFile!,
+          File(coverImageXFile!.path), // ✅ still works for mobile
           folder: 'recipes/covers',
         );
       }
@@ -208,7 +212,7 @@ class _EditRecipePageState extends State<EditRecipePage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Cover picker & preview
+                // ✅ Fixed Cover picker & preview
                 GestureDetector(
                   onTap: pickCoverImage,
                   child: Container(
@@ -217,17 +221,20 @@ class _EditRecipePageState extends State<EditRecipePage> {
                       border: Border.all(color: Colors.grey),
                       borderRadius: BorderRadius.circular(8),
                     ),
-                    child: coverImageFile != null
+                    child: coverImageXFile != null
                         ? ClipRRect(
                             borderRadius: BorderRadius.circular(8),
                             child: kIsWeb
                                 ? Image.network(
-                                    coverImageUrl ?? '',
+                                    coverImageXFile!
+                                        .path, // ✅ blob/data URI on web
                                     fit: BoxFit.cover,
                                     width: double.infinity,
                                   )
                                 : Image.file(
-                                    coverImageFile!,
+                                    File(
+                                      coverImageXFile!.path,
+                                    ), // ✅ File on mobile
                                     fit: BoxFit.cover,
                                     width: double.infinity,
                                   ),

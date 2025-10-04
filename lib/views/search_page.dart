@@ -86,8 +86,21 @@ class _SearchPageState extends State<SearchPage> {
 
       print('Found ${matches.length} total matches');
 
+      // Remove hidden recipes from results unless the current user is the author
+      final currentUser = FirebaseAuth.instance.currentUser;
+      final currentUid = currentUser?.uid;
+
+      final visibleMatches = matches.where((data) {
+        final isHiddenRaw = data['isHidden'];
+        final bool isHidden = isHiddenRaw == true || isHiddenRaw == 'true';
+        final authorId = (data['authorId'] ?? '').toString();
+        if (!isHidden) return true;
+        // allow owners to see their own hidden recipes
+        return currentUid != null && authorId == currentUid;
+      }).toList();
+
       setState(() {
-        results = matches;
+        results = visibleMatches;
         isLoading = false;
       });
     } catch (e) {

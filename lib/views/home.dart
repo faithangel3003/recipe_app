@@ -6,8 +6,15 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../model/recipe.dart';
 
-class HomePage extends StatelessWidget {
+class HomePage extends StatefulWidget {
   const HomePage({super.key});
+
+  @override
+  State<HomePage> createState() => _HomePageState();
+}
+
+class _HomePageState extends State<HomePage> {
+  String selectedCategory = "All"; // 🔥 selected category state
 
   @override
   Widget build(BuildContext context) {
@@ -62,14 +69,21 @@ class HomePage extends StatelessWidget {
               style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
             ),
             const SizedBox(height: 10),
-            Row(
-              children: [
-                _buildCategoryChip("All", true),
-                const SizedBox(width: 10),
-                _buildCategoryChip("Food", false),
-                const SizedBox(width: 10),
-                _buildCategoryChip("Drink", false),
-              ],
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  _buildCategoryChip("All"),
+                  const SizedBox(width: 10),
+                  _buildCategoryChip("Food"),
+                  const SizedBox(width: 10),
+                  _buildCategoryChip("Drink"),
+                  const SizedBox(width: 10),
+                  _buildCategoryChip("Snack"),
+                  const SizedBox(width: 10),
+                  _buildCategoryChip("Dessert"),
+                ],
+              ),
             ),
             const SizedBox(height: 20),
 
@@ -103,26 +117,34 @@ class HomePage extends StatelessWidget {
     );
   }
 
-  // Category Chip
-  static Widget _buildCategoryChip(String text, bool selected) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
-      decoration: BoxDecoration(
-        color: selected ? Colors.orange : Colors.grey.shade200,
-        borderRadius: BorderRadius.circular(25),
-      ),
-      child: Text(
-        text,
-        style: TextStyle(
-          color: selected ? Colors.white : Colors.black,
-          fontWeight: FontWeight.w500,
+  // Category Chip (now clickable)
+  Widget _buildCategoryChip(String text) {
+    final bool selected = (text == selectedCategory);
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          selectedCategory = text;
+        });
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
+        decoration: BoxDecoration(
+          color: selected ? Colors.orange : Colors.grey.shade200,
+          borderRadius: BorderRadius.circular(25),
+        ),
+        child: Text(
+          text,
+          style: TextStyle(
+            color: selected ? Colors.white : Colors.black,
+            fontWeight: FontWeight.w500,
+          ),
         ),
       ),
     );
   }
 
   // Following Food Grid
-  static Widget _buildFollowingFoodGrid() {
+  Widget _buildFollowingFoodGrid() {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
       return const Center(
@@ -211,7 +233,12 @@ class HomePage extends StatelessWidget {
                   final data = doc.data() as Map<String, dynamic>;
                   return Recipe.fromJson(data);
                 })
-                .where((recipe) => following.contains(recipe.authorId))
+                .where(
+                  (recipe) =>
+                      following.contains(recipe.authorId) &&
+                      (selectedCategory == "All" ||
+                          recipe.category == selectedCategory),
+                )
                 .toList();
 
             return GridView.builder(
@@ -242,8 +269,8 @@ class HomePage extends StatelessWidget {
     );
   }
 
-  // Food Grid (For You)
-  static Widget _buildFoodGrid() {
+  // Food Grid (For You) with filtering
+  Widget _buildFoodGrid() {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
       return const Center(child: Text('Please log in to like recipes.'));
@@ -273,7 +300,12 @@ class HomePage extends StatelessWidget {
               final data = doc.data() as Map<String, dynamic>;
               return Recipe.fromJson(data);
             })
-            .where((recipe) => !recipe.isHidden)
+            .where(
+              (recipe) =>
+                  !recipe.isHidden &&
+                  (selectedCategory == "All" ||
+                      recipe.category == selectedCategory),
+            )
             .toList();
 
         return GridView.builder(
@@ -281,14 +313,14 @@ class HomePage extends StatelessWidget {
           gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: 2,
             crossAxisSpacing: 12,
-            mainAxisSpacing: 20, // ⬅️ more vertical spacing
-            childAspectRatio: 0.90, // ⬅️ slightly smaller cards
+            mainAxisSpacing: 20,
+            childAspectRatio: 0.90,
           ),
           itemCount: recipes.length,
           itemBuilder: (context, index) {
             final item = recipes[index];
             return Padding(
-              padding: const EdgeInsets.only(bottom: 8), // ⬅️ space below cards
+              padding: const EdgeInsets.only(bottom: 8),
               child: _FoodGridItem(
                 item: item,
                 userId: userId,
