@@ -32,8 +32,7 @@ class FollowService {
       }
 
       // Check current follow status
-      final currentUserData =
-          currentUserSnap.data() as Map<String, dynamic>? ?? {};
+      final currentUserData = currentUserSnap.data() ?? <String, dynamic>{};
       final following = List<String>.from(currentUserData["following"] ?? []);
       final isFollowing = following.contains(targetUid);
 
@@ -94,7 +93,7 @@ class FollowService {
   Stream<bool> isFollowing(String currentUid, String targetUid) {
     return _db.collection("users").doc(currentUid).snapshots().map((snapshot) {
       if (!snapshot.exists) return false;
-      final data = snapshot.data() as Map<String, dynamic>? ?? {};
+      final data = snapshot.data() ?? <String, dynamic>{};
       final following = List<String>.from(data["following"] ?? []);
       return following.contains(targetUid);
     });

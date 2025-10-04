@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:final_proj/views/follow_list_page.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
@@ -6,8 +7,8 @@ import '../model/recipe.dart';
 import 'recipe_detail_page.dart';
 import 'dart:io';
 import '../services/cloudinary_service.dart';
-
 import 'edit_recipe_page.dart';
+import '../services/like_services.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -24,7 +25,8 @@ class _ProfilePageState extends State<ProfilePage> {
     final user = FirebaseAuth.instance.currentUser;
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Profile"),
+        title: const Text("My Profile"),
+        centerTitle: true,
         actions: [
           PopupMenuButton<String>(
             onSelected: (value) async {
@@ -45,8 +47,10 @@ class _ProfilePageState extends State<ProfilePage> {
       body: SingleChildScrollView(
         child: Column(
           children: [
-            // Profile header with image and upload button
+            const SizedBox(height: 20),
+            // Profile image with edit button
             Stack(
+              alignment: Alignment.center,
               children: [
                 CircleAvatar(
                   radius: 50,
@@ -56,7 +60,7 @@ class _ProfilePageState extends State<ProfilePage> {
                 ),
                 Positioned(
                   bottom: 0,
-                  right: 0,
+                  right: MediaQuery.of(context).size.width / 2 - 60,
                   child: GestureDetector(
                     onTap: () async {
                       final ImagePicker picker = ImagePicker();
@@ -82,37 +86,7 @@ class _ProfilePageState extends State<ProfilePage> {
                             .doc(user.uid)
                             .update({'profileImageUrl': uploadedUrl});
                         if (mounted) {
-                          Navigator.pop(context); // close loading dialog
-                          showDialog(
-                            context: context,
-                            builder: (_) => AlertDialog(
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(20),
-                              ),
-                              content: Column(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  const Icon(
-                                    Icons.check_circle,
-                                    color: Colors.green,
-                                    size: 48,
-                                  ),
-                                  const SizedBox(height: 10),
-                                  const Text(
-                                    "Profile picture updated!",
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 10),
-                                  ElevatedButton(
-                                    onPressed: () => Navigator.pop(context),
-                                    child: const Text("OK"),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          );
+                          Navigator.pop(context);
                           setState(() {});
                         }
                       }
@@ -137,9 +111,10 @@ class _ProfilePageState extends State<ProfilePage> {
             const SizedBox(height: 10),
             Text(
               user?.displayName ?? "Unknown User",
-              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
-            const SizedBox(height: 5),
+            const SizedBox(height: 15),
+            // Stats row
             StreamBuilder<DocumentSnapshot>(
               stream: FirebaseFirestore.instance
                   .collection('users')
@@ -147,7 +122,7 @@ class _ProfilePageState extends State<ProfilePage> {
                   .snapshots(),
               builder: (context, snapshot) {
                 if (!snapshot.hasData || !snapshot.data!.exists) {
-                  return const Text("Followers: 0 • Following: 0");
+                  return _buildStats(0, 0, 0);
                 }
                 final data =
                     snapshot.data!.data() as Map<String, dynamic>? ?? {};
@@ -155,7 +130,7 @@ class _ProfilePageState extends State<ProfilePage> {
                     (data['followers'] as List<dynamic>? ?? []).length;
                 final following =
                     (data['following'] as List<dynamic>? ?? []).length;
-                return Text("Followers: $followers • Following: $following");
+                return _buildStats(0, following, followers);
               },
             ),
             const SizedBox(height: 20),
@@ -174,6 +149,66 @@ class _ProfilePageState extends State<ProfilePage> {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildStats(int recipes, int following, int followers) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 16),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        children: [
+          _statItem("Recipes", recipes),
+
+          // ✅ FOLLOWING
+          GestureDetector(
+            behavior:
+                HitTestBehavior.opaque, // ensures the whole area is tappable
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => FollowListPage(
+                    userId: FirebaseAuth.instance.currentUser!.uid,
+                    type: 'following',
+                  ),
+                ),
+              );
+            },
+            child: _statItem("Following", following),
+          ),
+
+          // ✅ FOLLOWERS
+          GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => FollowListPage(
+                    userId: FirebaseAuth.instance.currentUser!.uid,
+                    type: 'followers',
+                  ),
+                ),
+              );
+            },
+            child: _statItem("Followers", followers),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _statItem(String label, int count) {
+    return Column(
+      children: [
+        Text(
+          count.toString(),
+          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+        ),
+        const SizedBox(height: 4),
+        Text(label, style: const TextStyle(color: Colors.grey, fontSize: 14)),
+      ],
     );
   }
 
@@ -208,6 +243,7 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 
+  // -------------------- Recipes Tab (Owner) -------------------- //
   Widget _buildFoodGrid() {
     final user = FirebaseAuth.instance.currentUser;
     return StreamBuilder<QuerySnapshot>(
@@ -216,9 +252,6 @@ class _ProfilePageState extends State<ProfilePage> {
           .where('authorId', isEqualTo: user!.uid)
           .snapshots(),
       builder: (context, snapshot) {
-        if (snapshot.hasError) {
-          return const Center(child: Text("Error loading recipes"));
-        }
         if (!snapshot.hasData) {
           return const Center(child: CircularProgressIndicator());
         }
@@ -232,165 +265,18 @@ class _ProfilePageState extends State<ProfilePage> {
           padding: const EdgeInsets.all(10),
           gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: 2,
-            crossAxisSpacing: 10,
-            mainAxisSpacing: 10,
-            childAspectRatio: 0.8,
+            crossAxisSpacing: 12,
+            mainAxisSpacing: 20,
+            childAspectRatio: 1.10,
           ),
           itemCount: docs.length,
           itemBuilder: (context, index) {
             final data = docs[index].data() as Map<String, dynamic>;
             final recipe = Recipe.fromJson(data);
-            return GestureDetector(
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => RecipeDetailPage(recipe: recipe),
-                  ),
-                );
-              },
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Stack(
-                    children: [
-                      ClipRRect(
-                        borderRadius: const BorderRadius.vertical(
-                          top: Radius.circular(16),
-                        ),
-                        child: recipe.coverImageUrl.isNotEmpty
-                            ? Image.network(
-                                recipe.coverImageUrl,
-                                height: 100,
-                                width: double.infinity,
-                                fit: BoxFit.cover,
-                                errorBuilder: (context, error, stackTrace) {
-                                  return Container(
-                                    height: 100,
-                                    color: Colors.grey.shade300,
-                                    child: const Center(
-                                      child: Icon(Icons.broken_image, size: 40),
-                                    ),
-                                  );
-                                },
-                              )
-                            : Container(
-                                height: 100,
-                                color: Colors.grey.shade300,
-                                child: const Center(
-                                  child: Icon(Icons.image, size: 40),
-                                ),
-                              ),
-                      ),
-                      Positioned(
-                        right: 8,
-                        top: 8,
-                        child: Container(
-                          decoration: BoxDecoration(
-                            color: Colors.deepOrange,
-                            shape: BoxShape.circle,
-                          ),
-                          child: PopupMenuButton<String>(
-                            icon: const Icon(
-                              Icons.more_vert,
-                              color: Colors.white,
-                              size: 28,
-                            ),
-                            onSelected: (value) async {
-                              if (value == 'edit') {
-                                final result = await Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) => EditRecipePage(
-                                      recipeId: docs[index].id,
-                                      recipeData: data,
-                                    ),
-                                  ),
-                                );
-                                if (result == true) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                      content: Text('Recipe updated'),
-                                    ),
-                                  );
-                                }
-                              } else if (value == 'delete') {
-                                await FirebaseFirestore.instance
-                                    .collection('recipes')
-                                    .doc(docs[index].id)
-                                    .delete();
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text('Recipe deleted'),
-                                  ),
-                                );
-                              }
-                            },
-                            itemBuilder: (context) => [
-                              const PopupMenuItem(
-                                value: 'edit',
-                                child: Text('Edit'),
-                              ),
-                              const PopupMenuItem(
-                                value: 'delete',
-                                child: Text('Delete'),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.all(8),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          recipe.authorName,
-                          style: const TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          recipe.title,
-                          style: const TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
-                          ),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          '${recipe.category} • ${recipe.cookingDuration} mins',
-                          style: const TextStyle(
-                            color: Colors.grey,
-                            fontSize: 12,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Row(
-                          children: [
-                            const Icon(
-                              Icons.favorite,
-                              color: Colors.red,
-                              size: 16,
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              '${recipe.likes} likes',
-                              style: const TextStyle(fontSize: 12),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
+            return _ProfileRecipeCard(
+              recipe: recipe,
+              recipeId: docs[index].id,
+              isOwner: true, // Recipes tab
             );
           },
         );
@@ -398,20 +284,15 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 
+  // -------------------- Liked Tab -------------------- //
   Widget _buildLikedGrid() {
     final user = FirebaseAuth.instance.currentUser;
-    if (user == null) {
-      return const Center(child: Text("Please log in to see liked recipes"));
-    }
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance
           .collection('recipes')
-          .where('likedBy', arrayContains: user.uid)
+          .where('likedBy', arrayContains: user!.uid)
           .snapshots(),
       builder: (context, snapshot) {
-        if (snapshot.hasError) {
-          return const Center(child: Text("Error loading liked recipes"));
-        }
         if (!snapshot.hasData) {
           return const Center(child: CircularProgressIndicator());
         }
@@ -425,112 +306,275 @@ class _ProfilePageState extends State<ProfilePage> {
           padding: const EdgeInsets.all(10),
           gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: 2,
-            crossAxisSpacing: 10,
-            mainAxisSpacing: 10,
-            childAspectRatio: 0.8,
+            crossAxisSpacing: 12,
+            mainAxisSpacing: 20,
+            childAspectRatio: 0.90,
           ),
           itemCount: docs.length,
           itemBuilder: (context, index) {
             final data = docs[index].data() as Map<String, dynamic>;
             final recipe = Recipe.fromJson(data);
-            return GestureDetector(
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => RecipeDetailPage(recipe: recipe),
-                  ),
-                );
-              },
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Stack(
-                    children: [
-                      ClipRRect(
-                        borderRadius: const BorderRadius.vertical(
-                          top: Radius.circular(16),
-                        ),
-                        child: recipe.coverImageUrl.isNotEmpty
-                            ? Image.network(
-                                recipe.coverImageUrl,
-                                height: 100,
-                                width: double.infinity,
-                                fit: BoxFit.cover,
-                                errorBuilder: (context, error, stackTrace) {
-                                  return Container(
-                                    height: 100,
-                                    color: Colors.grey.shade300,
-                                    child: const Center(
-                                      child: Icon(Icons.broken_image, size: 40),
-                                    ),
-                                  );
-                                },
-                              )
-                            : Container(
-                                height: 100,
-                                color: Colors.grey.shade300,
-                                child: const Center(
-                                  child: Icon(Icons.image, size: 40),
-                                ),
-                              ),
-                      ),
-                    ],
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.all(8),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          recipe.authorName,
-                          style: const TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          recipe.title,
-                          style: const TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
-                          ),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          '${recipe.category} • ${recipe.cookingDuration} mins',
-                          style: const TextStyle(
-                            color: Colors.grey,
-                            fontSize: 12,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Row(
-                          children: [
-                            const Icon(
-                              Icons.favorite,
-                              color: Colors.red,
-                              size: 16,
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              '${recipe.likes} likes',
-                              style: const TextStyle(fontSize: 12),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
+            return _ProfileRecipeCard(
+              recipe: recipe,
+              recipeId: docs[index].id,
+              isOwner: false, // Liked tab
             );
           },
         );
       },
+    );
+  }
+}
+
+// -------------------- Profile Recipe Card -------------------- //
+class _ProfileRecipeCard extends StatefulWidget {
+  final Recipe recipe;
+  final String recipeId;
+  final bool isOwner; // true = Recipes tab, false = Liked tab
+  const _ProfileRecipeCard({
+    required this.recipe,
+    required this.recipeId,
+    required this.isOwner,
+    Key? key,
+  }) : super(key: key);
+
+  @override
+  State<_ProfileRecipeCard> createState() => _ProfileRecipeCardState();
+}
+
+class _ProfileRecipeCardState extends State<_ProfileRecipeCard> {
+  late bool _isLiked;
+  late int _likesCount;
+  bool _isLoading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _isLiked = widget.recipe.likedBy.contains(
+      FirebaseAuth.instance.currentUser!.uid,
+    );
+    _likesCount = widget.recipe.likes;
+  }
+
+  Future<void> _handleLike() async {
+    if (_isLoading) return;
+    setState(() => _isLoading = true);
+
+    final bool originalIsLiked = _isLiked;
+    final int originalLikesCount = _likesCount;
+
+    setState(() {
+      if (_isLiked)
+        _likesCount--;
+      else
+        _likesCount++;
+      _isLiked = !_isLiked;
+    });
+
+    try {
+      await LikeService().toggleLike(
+        widget.recipe.id,
+        FirebaseAuth.instance.currentUser!.uid,
+        FirebaseAuth.instance.currentUser!.displayName ?? "Unknown",
+        FirebaseAuth.instance.currentUser!.photoURL ?? "",
+      );
+    } catch (e) {
+      setState(() {
+        _isLiked = originalIsLiked;
+        _likesCount = originalLikesCount;
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to update like: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final recipe = widget.recipe;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Author Row ONLY for Liked tab
+        if (!widget.isOwner)
+          FutureBuilder<DocumentSnapshot>(
+            future: FirebaseFirestore.instance
+                .collection('users')
+                .doc(recipe.authorId)
+                .get(),
+            builder: (context, snapshot) {
+              if (!snapshot.hasData) return const SizedBox(height: 30);
+              final userData = snapshot.data!.data() as Map<String, dynamic>?;
+              if (userData == null) return const SizedBox(height: 30);
+
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 6),
+                child: Row(
+                  children: [
+                    CircleAvatar(
+                      radius: 14,
+                      backgroundImage:
+                          (userData['profileImageUrl'] != null &&
+                              userData['profileImageUrl'].isNotEmpty)
+                          ? NetworkImage(userData['profileImageUrl'])
+                          : null,
+                      child:
+                          (userData['profileImageUrl'] == null ||
+                              userData['profileImageUrl'].isEmpty)
+                          ? const Icon(Icons.person, size: 16)
+                          : null,
+                    ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        userData['username'] ?? "Unknown",
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+
+        // Recipe Card wrapped in GestureDetector to navigate to RecipeDetailPage
+        Expanded(
+          child: GestureDetector(
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => RecipeDetailPage(recipe: recipe),
+                ),
+              );
+            },
+            child: Stack(
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(16),
+                  child: recipe.coverImageUrl.isNotEmpty
+                      ? Image.network(
+                          recipe.coverImageUrl,
+                          width: double.infinity,
+                          height: double.infinity,
+                          fit: BoxFit.cover,
+                        )
+                      : Container(
+                          decoration: BoxDecoration(
+                            color: Colors.grey.shade300,
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          child: const Center(child: Icon(Icons.image)),
+                        ),
+                ),
+                // Heart icon ONLY for Liked tab
+                if (!widget.isOwner)
+                  Positioned(
+                    right: 8,
+                    top: 8,
+                    child: GestureDetector(
+                      onTap: _handleLike,
+                      child: CircleAvatar(
+                        backgroundColor: Colors.white.withOpacity(0.9),
+                        radius: 16,
+                        child: _isLoading
+                            ? const SizedBox(
+                                width: 12,
+                                height: 12,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : Icon(
+                                _isLiked
+                                    ? Icons.favorite
+                                    : Icons.favorite_border,
+                                color: _isLiked ? Colors.red : Colors.grey,
+                                size: 18,
+                              ),
+                      ),
+                    ),
+                  ),
+                // 3-dot menu ONLY for Recipes tab
+                if (widget.isOwner)
+                  Positioned(
+                    right: 8,
+                    top: 8,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: Colors.black.withOpacity(0.5),
+                        shape: BoxShape.circle,
+                      ),
+                      child: PopupMenuButton<String>(
+                        icon: const Icon(
+                          Icons.more_vert,
+                          color: Colors.white,
+                          size: 20,
+                        ),
+                        onSelected: (value) async {
+                          if (value == 'edit') {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => EditRecipePage(
+                                  recipeId: widget.recipeId,
+                                  recipeData: recipe.toJson(),
+                                ),
+                              ),
+                            );
+                          } else if (value == 'delete') {
+                            await FirebaseFirestore.instance
+                                .collection('recipes')
+                                .doc(widget.recipeId)
+                                .delete();
+                          }
+                        },
+                        itemBuilder: (context) => const [
+                          PopupMenuItem(value: 'edit', child: Text('Edit')),
+                          PopupMenuItem(value: 'delete', child: Text('Delete')),
+                        ],
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
+
+        const SizedBox(height: 6),
+        // Title + Meta + Likes
+        Text(
+          recipe.title,
+          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+        const SizedBox(height: 4),
+        Text(
+          '${recipe.category} • ${recipe.cookingDuration} mins',
+          style: const TextStyle(color: Colors.grey, fontSize: 12),
+        ),
+        const SizedBox(height: 4),
+        Row(
+          children: [
+            Icon(Icons.favorite, color: Colors.red.shade400, size: 14),
+            const SizedBox(width: 4),
+            Text('$_likesCount likes', style: const TextStyle(fontSize: 12)),
+          ],
+        ),
+      ],
     );
   }
 }

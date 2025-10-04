@@ -1,8 +1,10 @@
 import 'package:final_proj/views/notification_page.dart';
+import 'package:final_proj/views/upload_page.dart';
 
 import 'views/home.dart';
-import 'views/upload_page.dart';
+
 import 'package:flutter/material.dart';
+
 import 'views/profile_page.dart';
 
 class MainPage extends StatefulWidget {
@@ -25,7 +27,7 @@ class _MainPageState extends State<MainPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: _pages[_currentIndex], // ✅ show the selected page
+      body: _pages[_currentIndex],
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _currentIndex,
         selectedItemColor: Colors.orange,

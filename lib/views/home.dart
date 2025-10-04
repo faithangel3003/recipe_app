@@ -1,6 +1,6 @@
 import 'package:final_proj/services/like_services.dart';
 import 'package:final_proj/views/recipe_detail_page.dart';
-import 'package:final_proj/views/search_page.dart'; // ✅ import search page
+import 'package:final_proj/views/search_page.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -23,7 +23,7 @@ class HomePage extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // 🔎 Search Bar → navigates to SearchPage
+            // 🔎 Search Bar
             GestureDetector(
               onTap: () {
                 Navigator.push(
@@ -73,7 +73,7 @@ class HomePage extends StatelessWidget {
             ),
             const SizedBox(height: 20),
 
-            // Tabs (Left / Right)
+            // Tabs
             DefaultTabController(
               length: 2,
               child: Expanded(
@@ -84,16 +84,13 @@ class HomePage extends StatelessWidget {
                       unselectedLabelColor: Colors.grey,
                       indicatorColor: Colors.green,
                       tabs: [
-                        Tab(text: "Left"),
-                        Tab(text: "Right"),
+                        Tab(text: "For You"),
+                        Tab(text: "Following"),
                       ],
                     ),
                     Expanded(
                       child: TabBarView(
-                        children: [
-                          _buildFoodGrid(),
-                          const Center(child: Text("Right Tab Content")),
-                        ],
+                        children: [_buildFoodGrid(), _buildFollowingFoodGrid()],
                       ),
                     ),
                   ],
@@ -106,7 +103,7 @@ class HomePage extends StatelessWidget {
     );
   }
 
-  // Category Chip Widget
+  // Category Chip
   static Widget _buildCategoryChip(String text, bool selected) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
@@ -124,7 +121,128 @@ class HomePage extends StatelessWidget {
     );
   }
 
-  // Food Grid
+  // Following Food Grid
+  static Widget _buildFollowingFoodGrid() {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      return const Center(
+        child: Text('Please log in to see followed recipes.'),
+      );
+    }
+    final userId = user.uid;
+    final userName = user.displayName ?? "Unknown";
+    final userImage = user.photoURL ?? "";
+
+    return StreamBuilder<DocumentSnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection('users')
+          .doc(userId)
+          .snapshots(),
+      builder: (context, userSnapshot) {
+        if (userSnapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        if (!userSnapshot.hasData || userSnapshot.data == null) {
+          return const Center(child: Text('Unable to load user data'));
+        }
+
+        final userData = userSnapshot.data!.data() as Map<String, dynamic>?;
+        if (userData == null) {
+          return const Center(child: Text('User data not found'));
+        }
+
+        final following = List<String>.from(userData['following'] ?? []);
+
+        if (following.isEmpty) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.people_outline,
+                  size: 48,
+                  color: Colors.grey.shade400,
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'Follow some chefs to see their recipes here!',
+                  style: TextStyle(color: Colors.grey.shade600),
+                ),
+              ],
+            ),
+          );
+        }
+
+        return StreamBuilder<QuerySnapshot>(
+          stream: FirebaseFirestore.instance
+              .collection('recipes')
+              .orderBy('createdAt', descending: true)
+              .snapshots(),
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Center(child: CircularProgressIndicator());
+            }
+            if (snapshot.hasError) {
+              return Center(child: Text('Error: ${snapshot.error}'));
+            }
+            if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+              return Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.restaurant,
+                      size: 48,
+                      color: Colors.grey.shade400,
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'No recipes yet from people you follow',
+                      style: TextStyle(color: Colors.grey.shade600),
+                    ),
+                  ],
+                ),
+              );
+            }
+
+            final recipes = snapshot.data!.docs
+                .map((doc) {
+                  final data = doc.data() as Map<String, dynamic>;
+                  return Recipe.fromJson(data);
+                })
+                .where((recipe) => following.contains(recipe.authorId))
+                .toList();
+
+            return GridView.builder(
+              padding: const EdgeInsets.all(10),
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 2,
+                crossAxisSpacing: 12,
+                mainAxisSpacing: 20,
+                childAspectRatio: 0.90,
+              ),
+              itemCount: recipes.length,
+              itemBuilder: (context, index) {
+                final item = recipes[index];
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: _FoodGridItem(
+                    item: item,
+                    userId: userId,
+                    userName: userName,
+                    userImage: userImage,
+                  ),
+                );
+              },
+            );
+          },
+        );
+      },
+    );
+  }
+
+  // Food Grid (For You)
   static Widget _buildFoodGrid() {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
@@ -150,27 +268,33 @@ class HomePage extends StatelessWidget {
           return const Center(child: Text('No recipes found'));
         }
 
-        final recipes = snapshot.data!.docs.map((doc) {
-          final data = doc.data() as Map<String, dynamic>;
-          return Recipe.fromJson(data);
-        }).toList();
+        final recipes = snapshot.data!.docs
+            .map((doc) {
+              final data = doc.data() as Map<String, dynamic>;
+              return Recipe.fromJson(data);
+            })
+            .where((recipe) => !recipe.isHidden)
+            .toList();
 
         return GridView.builder(
-          padding: const EdgeInsets.only(top: 10),
+          padding: const EdgeInsets.all(10),
           gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: 2,
-            childAspectRatio: 0.8,
-            crossAxisSpacing: 10,
-            mainAxisSpacing: 10,
+            crossAxisSpacing: 12,
+            mainAxisSpacing: 20, // ⬅️ more vertical spacing
+            childAspectRatio: 0.90, // ⬅️ slightly smaller cards
           ),
           itemCount: recipes.length,
           itemBuilder: (context, index) {
             final item = recipes[index];
-            return _FoodGridItem(
-              item: item,
-              userId: userId,
-              userName: userName,
-              userImage: userImage,
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 8), // ⬅️ space below cards
+              child: _FoodGridItem(
+                item: item,
+                userId: userId,
+                userName: userName,
+                userImage: userImage,
+              ),
             );
           },
         );
@@ -179,7 +303,6 @@ class HomePage extends StatelessWidget {
   }
 }
 
-// 🔥 Food Item Card
 class _FoodGridItem extends StatefulWidget {
   final Recipe item;
   final String userId;
@@ -211,10 +334,7 @@ class _FoodGridItemState extends State<_FoodGridItem> {
 
   Future<void> _handleLike() async {
     if (_isLoading) return;
-
-    setState(() {
-      _isLoading = true;
-    });
+    setState(() => _isLoading = true);
 
     final bool originalIsLiked = _isLiked;
     final int originalLikesCount = _likesCount;
@@ -250,122 +370,142 @@ class _FoodGridItemState extends State<_FoodGridItem> {
         );
       }
     } finally {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-      }
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final item = widget.item;
-    return GestureDetector(
-      onTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => RecipeDetailPage(recipe: item)),
-        );
-      },
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Stack(
-            children: [
-              ClipRRect(
-                borderRadius: const BorderRadius.vertical(
-                  top: Radius.circular(16),
-                ),
-                child: item.coverImageUrl.isNotEmpty
-                    ? Image.network(
-                        item.coverImageUrl,
-                        height: 100,
-                        width: double.infinity,
-                        fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) {
-                          return Container(
-                            height: 100,
-                            color: Colors.grey.shade300,
-                            child: const Center(
-                              child: Icon(Icons.broken_image, size: 40),
-                            ),
-                          );
-                        },
-                      )
-                    : Container(
-                        height: 100,
-                        color: Colors.grey.shade300,
-                        child: const Center(child: Icon(Icons.image, size: 40)),
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // 👤 Author Row ABOVE card
+        FutureBuilder<DocumentSnapshot>(
+          future: FirebaseFirestore.instance
+              .collection('users')
+              .doc(item.authorId) // must exist in Recipe
+              .get(),
+          builder: (context, snapshot) {
+            if (!snapshot.hasData) return const SizedBox(height: 30);
+            final userData = snapshot.data!.data() as Map<String, dynamic>?;
+            if (userData == null) return const SizedBox(height: 30);
+
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 6),
+              child: Row(
+                children: [
+                  CircleAvatar(
+                    radius: 14,
+                    backgroundImage:
+                        userData['profileImageUrl'] != null &&
+                            userData['profileImageUrl'].isNotEmpty
+                        ? NetworkImage(userData['profileImageUrl'])
+                        : null,
+                    child:
+                        (userData['profileImageUrl'] == null ||
+                            userData['profileImageUrl'].isEmpty)
+                        ? const Icon(Icons.person, size: 16)
+                        : null,
+                  ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      userData['username'] ?? "Unknown",
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
                       ),
-              ),
-              Positioned(
-                right: 8,
-                top: 8,
-                child: GestureDetector(
-                  onTap: _handleLike,
-                  child: CircleAvatar(
-                    backgroundColor: Colors.white.withOpacity(0.9),
-                    radius: 16,
-                    child: _isLoading
-                        ? const SizedBox(
-                            width: 12,
-                            height: 12,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : Icon(
-                            _isLiked ? Icons.favorite : Icons.favorite_border,
-                            color: _isLiked ? Colors.red : Colors.grey,
-                            size: 18,
-                          ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-          Padding(
-            padding: const EdgeInsets.all(8),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  item.authorName,
-                  style: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  item.title,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                  ),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  '${item.category} • ${item.cookingDuration} mins',
-                  style: const TextStyle(color: Colors.grey, fontSize: 12),
-                ),
-                const SizedBox(height: 4),
-                Row(
-                  children: [
-                    const Icon(Icons.favorite, color: Colors.red, size: 16),
-                    const SizedBox(width: 4),
-                    Text(
-                      '$_likesCount likes',
-                      style: const TextStyle(fontSize: 12),
+                      overflow: TextOverflow.ellipsis,
                     ),
-                  ],
+                  ),
+                ],
+              ),
+            );
+          },
+        ),
+
+        // 📌 Recipe Card (only image + heart)
+        Expanded(
+          child: GestureDetector(
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => RecipeDetailPage(recipe: item),
+                ),
+              );
+            },
+            child: Stack(
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(16),
+                  child: item.coverImageUrl.isNotEmpty
+                      ? Image.network(
+                          item.coverImageUrl,
+                          width: double.infinity,
+                          height: double.infinity,
+                          fit: BoxFit.cover,
+                        )
+                      : Container(
+                          decoration: BoxDecoration(
+                            color: Colors.grey.shade300,
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          child: const Center(child: Icon(Icons.image)),
+                        ),
+                ),
+                Positioned(
+                  right: 8,
+                  top: 8,
+                  child: GestureDetector(
+                    onTap: _handleLike,
+                    child: CircleAvatar(
+                      backgroundColor: Colors.white.withOpacity(0.9),
+                      radius: 16,
+                      child: _isLoading
+                          ? const SizedBox(
+                              width: 12,
+                              height: 12,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : Icon(
+                              _isLiked ? Icons.favorite : Icons.favorite_border,
+                              color: _isLiked ? Colors.red : Colors.grey,
+                              size: 18,
+                            ),
+                    ),
+                  ),
                 ),
               ],
             ),
           ),
-        ],
-      ),
+        ),
+
+        const SizedBox(height: 6),
+
+        // 📌 Title + Meta + Likes BELOW card
+        Text(
+          item.title,
+          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+        const SizedBox(height: 4),
+        Text(
+          '${item.category} • ${item.cookingDuration} mins',
+          style: const TextStyle(color: Colors.grey, fontSize: 12),
+        ),
+        const SizedBox(height: 4),
+        Row(
+          children: [
+            Icon(Icons.favorite, color: Colors.red.shade400, size: 14),
+            const SizedBox(width: 4),
+            Text('$_likesCount likes', style: const TextStyle(fontSize: 12)),
+          ],
+        ),
+      ],
     );
   }
 }
