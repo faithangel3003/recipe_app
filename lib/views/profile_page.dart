@@ -9,6 +9,8 @@ import 'dart:io';
 import '../services/cloudinary_service.dart';
 import 'edit_recipe_page.dart';
 import '../services/like_services.dart';
+import 'edit_profile_page.dart';
+import '../model/user.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -20,6 +22,43 @@ class ProfilePage extends StatefulWidget {
 class _ProfilePageState extends State<ProfilePage> {
   int _selectedIndex = 0;
 
+  Future<void> _openEditProfile() async {
+    final firebaseUser = FirebaseAuth.instance.currentUser;
+    if (firebaseUser == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please log in to edit your profile')),
+      );
+      return;
+    }
+
+    try {
+      final doc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(firebaseUser.uid)
+          .get();
+
+      if (!doc.exists) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('User data not found')));
+        return;
+      }
+
+      final data = doc.data() ?? <String, dynamic>{};
+      data['uid'] = data['uid'] ?? firebaseUser.uid;
+      final appUser = AppUser.fromJson(Map<String, dynamic>.from(data));
+
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => EditProfilePage(user: appUser)),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Failed to open editor: $e')));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final user = FirebaseAuth.instance.currentUser;
@@ -28,6 +67,12 @@ class _ProfilePageState extends State<ProfilePage> {
         title: const Text("My Profile"),
         centerTitle: true,
         actions: [
+          IconButton(
+            icon: const Icon(Icons.edit),
+            onPressed: () async {
+              await _openEditProfile();
+            },
+          ),
           PopupMenuButton<String>(
             onSelected: (value) async {
               if (value == 'logout') {
@@ -35,9 +80,12 @@ class _ProfilePageState extends State<ProfilePage> {
                 if (mounted) {
                   Navigator.of(context).pushReplacementNamed("/login");
                 }
+              } else if (value == 'edit') {
+                await _openEditProfile();
               }
             },
             itemBuilder: (context) => [
+              const PopupMenuItem(value: 'edit', child: Text('Edit Profile')),
               const PopupMenuItem(value: 'logout', child: Text("Log Out")),
             ],
             icon: const Icon(Icons.more_vert),
@@ -48,74 +96,96 @@ class _ProfilePageState extends State<ProfilePage> {
         child: Column(
           children: [
             const SizedBox(height: 20),
-            // Profile image with edit button
-            Stack(
-              alignment: Alignment.center,
-              children: [
-                CircleAvatar(
-                  radius: 50,
-                  backgroundImage: user?.photoURL != null
-                      ? NetworkImage(user!.photoURL!)
-                      : const NetworkImage("https://via.placeholder.com/150"),
-                ),
-                Positioned(
-                  bottom: 0,
-                  right: MediaQuery.of(context).size.width / 2 - 60,
-                  child: GestureDetector(
-                    onTap: () async {
-                      final ImagePicker picker = ImagePicker();
-                      final XFile? x = await picker.pickImage(
-                        source: ImageSource.gallery,
-                        imageQuality: 80,
-                      );
-                      if (x != null && user != null) {
-                        showDialog(
-                          context: context,
-                          barrierDismissible: false,
-                          builder: (_) =>
-                              const Center(child: CircularProgressIndicator()),
-                        );
-                        final cloudinary = CloudinaryService();
-                        String uploadedUrl = await cloudinary.uploadFile(
-                          File(x.path),
-                          folder: 'users/profile_images',
-                        );
-                        await user.updatePhotoURL(uploadedUrl);
-                        await FirebaseFirestore.instance
-                            .collection('users')
-                            .doc(user.uid)
-                            .update({'profileImageUrl': uploadedUrl});
-                        if (mounted) {
-                          Navigator.pop(context);
-                          setState(() {});
-                        }
-                      }
-                    },
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: Colors.orange,
-                        shape: BoxShape.circle,
-                        border: Border.all(color: Colors.white, width: 2),
-                      ),
-                      padding: const EdgeInsets.all(6),
-                      child: const Icon(
-                        Icons.add,
-                        color: Colors.white,
-                        size: 22,
+
+            Center(
+              child: SizedBox(
+                width: 120,
+                height: 120,
+                child: Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    Align(
+                      alignment: Alignment.center,
+                      child: CircleAvatar(
+                        radius: 50,
+                        backgroundImage: user?.photoURL != null
+                            ? NetworkImage(user!.photoURL!)
+                            : const NetworkImage(
+                                "https://via.placeholder.com/150",
+                              ),
                       ),
                     ),
-                  ),
+
+                    Positioned(
+                      right: 4,
+                      bottom: 4,
+                      child: GestureDetector(
+                        onTap: () async {
+                          final ImagePicker picker = ImagePicker();
+                          final XFile? x = await picker.pickImage(
+                            source: ImageSource.gallery,
+                            imageQuality: 80,
+                          );
+                          if (x != null && user != null) {
+                            showDialog(
+                              context: context,
+                              barrierDismissible: false,
+                              builder: (_) => const Center(
+                                child: CircularProgressIndicator(),
+                              ),
+                            );
+                            try {
+                              final cloudinary = CloudinaryService();
+                              String uploadedUrl = await cloudinary.uploadFile(
+                                File(x.path),
+                                folder: 'users/profile_images',
+                              );
+                              await user.updatePhotoURL(uploadedUrl);
+                              await FirebaseFirestore.instance
+                                  .collection('users')
+                                  .doc(user.uid)
+                                  .update({'profileImageUrl': uploadedUrl});
+                            } catch (e) {
+                              debugPrint('Failed to upload profile image: $e');
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text('Upload failed: $e')),
+                              );
+                            } finally {
+                              if (mounted) {
+                                Navigator.pop(context);
+                                setState(() {});
+                              }
+                            }
+                          }
+                        },
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: Colors.orange,
+                            shape: BoxShape.circle,
+                            border: Border.all(color: Colors.white, width: 2),
+                          ),
+                          padding: const EdgeInsets.all(6),
+                          child: const Icon(
+                            Icons.add,
+                            color: Colors.white,
+                            size: 22,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-              ],
+              ),
             ),
+
             const SizedBox(height: 10),
             Text(
               user?.displayName ?? "Unknown User",
               style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 15),
-            // Stats row: user doc stream to show follower/following counts and
-            // nested stream to count recipes authored by the current user.
+
+            // ✅ Stats row
             StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
               stream: FirebaseFirestore.instance
                   .collection('users')
@@ -131,7 +201,6 @@ class _ProfilePageState extends State<ProfilePage> {
                 final following =
                     (data['following'] as List<dynamic>? ?? []).length;
 
-                // Nested stream to count recipes authored by this user
                 return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
                   stream: FirebaseFirestore.instance
                       .collection('recipes')
@@ -146,8 +215,10 @@ class _ProfilePageState extends State<ProfilePage> {
                 );
               },
             ),
+
             const SizedBox(height: 20),
-            // Tab bar
+
+            // ✅ Tabs
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
@@ -157,7 +228,6 @@ class _ProfilePageState extends State<ProfilePage> {
               ],
             ),
             const SizedBox(height: 10),
-            // Tab content
             _selectedIndex == 0 ? _buildFoodGrid() : _buildLikedGrid(),
           ],
         ),
@@ -165,6 +235,7 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 
+  // --- Stats Builder
   Widget _buildStats(int recipes, int following, int followers) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 16),
@@ -173,10 +244,7 @@ class _ProfilePageState extends State<ProfilePage> {
         children: [
           _statItem("Recipes", recipes),
 
-          // ✅ FOLLOWING
           GestureDetector(
-            behavior:
-                HitTestBehavior.opaque, // ensures the whole area is tappable
             onTap: () {
               Navigator.push(
                 context,
@@ -190,9 +258,7 @@ class _ProfilePageState extends State<ProfilePage> {
             child: _statItem("Following", following),
           ),
 
-          // ✅ FOLLOWERS
           GestureDetector(
-            behavior: HitTestBehavior.opaque,
             onTap: () {
               Navigator.push(
                 context,

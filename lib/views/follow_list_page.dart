@@ -43,7 +43,11 @@ class _UserList extends StatelessWidget {
 
   const _UserList({required this.userId, required this.type});
 
-  Future<void> _toggleFollow(String targetUserId, bool isFollowing) async {
+  Future<void> _toggleFollow(
+    String targetUserId,
+    bool isFollowing,
+    BuildContext context,
+  ) async {
     final currentUser = FirebaseAuth.instance.currentUser!;
     final currentUid = currentUser.uid;
 
@@ -54,22 +58,31 @@ class _UserList extends StatelessWidget {
         .collection("users")
         .doc(targetUserId);
 
-    if (isFollowing) {
-      // Unfollow
-      await currentUserRef.update({
-        "following": FieldValue.arrayRemove([targetUserId]),
-      });
-      await targetUserRef.update({
-        "followers": FieldValue.arrayRemove([currentUid]),
-      });
-    } else {
-      // Follow
-      await currentUserRef.update({
-        "following": FieldValue.arrayUnion([targetUserId]),
-      });
-      await targetUserRef.update({
-        "followers": FieldValue.arrayUnion([currentUid]),
-      });
+    try {
+      if (isFollowing) {
+        // Unfollow
+        await currentUserRef.update({
+          "following": FieldValue.arrayRemove([targetUserId]),
+        });
+        await targetUserRef.update({
+          "followers": FieldValue.arrayRemove([currentUid]),
+        });
+      } else {
+        // Follow
+        await currentUserRef.update({
+          "following": FieldValue.arrayUnion([targetUserId]),
+        });
+        await targetUserRef.update({
+          "followers": FieldValue.arrayUnion([currentUid]),
+        });
+      }
+    } catch (e) {
+      debugPrint("Follow/Unfollow error: $e");
+      if (context.mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text("Something went wrong: $e")));
+      }
     }
   }
 
@@ -87,7 +100,7 @@ class _UserList extends StatelessWidget {
           return const Center(child: CircularProgressIndicator());
         }
         final data = snapshot.data!.data() ?? <String, dynamic>{};
-        final List<dynamic> ids = List<dynamic>.from(data[type] ?? []);
+        final List<String> ids = List<String>.from(data[type] ?? []);
 
         if (ids.isEmpty) {
           return Center(child: Text("No $type yet"));
@@ -107,55 +120,71 @@ class _UserList extends StatelessWidget {
                   return const ListTile(title: Text("Loading..."));
                 }
                 final userData = userSnap.data!.data() ?? <String, dynamic>{};
-
                 if (userData.isEmpty) return const SizedBox();
 
                 final username = userData['username'] ?? "Unknown";
                 final profileUrl = userData['profileImageUrl'] ?? "";
-                final List<dynamic> theirFollowers =
-                    userData['followers'] ?? [];
 
-                final bool isFollowing = theirFollowers.contains(currentUid);
+                return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+                  stream: FirebaseFirestore.instance
+                      .collection("users")
+                      .doc(currentUid)
+                      .snapshots(),
+                  builder: (context, currentUserSnap) {
+                    if (!currentUserSnap.hasData) return const SizedBox();
+                    final currentData =
+                        currentUserSnap.data!.data() ?? <String, dynamic>{};
+                    final List<String> myFollowing = List<String>.from(
+                      currentData['following'] ?? [],
+                    );
+                    final bool isFollowing = myFollowing.contains(uid);
 
-                return ListTile(
-                  leading: CircleAvatar(
-                    backgroundImage: profileUrl.isNotEmpty
-                        ? NetworkImage(profileUrl)
-                        : null,
-                    child: profileUrl.isEmpty ? const Icon(Icons.person) : null,
-                  ),
-                  title: Text(username),
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) =>
-                            OtherUserProfilePage(userId: uid.toString()),
+                    return ListTile(
+                      leading: CircleAvatar(
+                        backgroundImage: profileUrl.isNotEmpty
+                            ? NetworkImage(profileUrl)
+                            : null,
+                        child: profileUrl.isEmpty
+                            ? const Icon(Icons.person)
+                            : null,
                       ),
+                      title: Text(username),
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) =>
+                                OtherUserProfilePage(userId: uid.toString()),
+                          ),
+                        );
+                      },
+                      trailing: uid == currentUid
+                          ? null
+                          : ElevatedButton(
+                              onPressed: () => _toggleFollow(
+                                uid.toString(),
+                                isFollowing,
+                                context,
+                              ),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: isFollowing
+                                    ? Colors.grey[300]
+                                    : Colors.blue,
+                                foregroundColor: isFollowing
+                                    ? Colors.black
+                                    : Colors.white,
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                  vertical: 6,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                              ),
+                              child: Text(isFollowing ? "Following" : "Follow"),
+                            ),
                     );
                   },
-                  trailing: uid == currentUid
-                      ? null
-                      : ElevatedButton(
-                          onPressed: () =>
-                              _toggleFollow(uid.toString(), isFollowing),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: isFollowing
-                                ? Colors.grey[300]
-                                : Colors.blue,
-                            foregroundColor: isFollowing
-                                ? Colors.black
-                                : Colors.white,
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 6,
-                            ),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                          ),
-                          child: Text(isFollowing ? "Following" : "Follow"),
-                        ),
                 );
               },
             );
