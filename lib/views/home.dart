@@ -19,12 +19,33 @@ class _HomePageState extends State<HomePage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        automaticallyImplyLeading: false,
-        title: const Text(""),
-        backgroundColor: Colors.white,
-        elevation: 0,
+       appBar: AppBar(
+  automaticallyImplyLeading: false,
+  elevation: 0,
+  flexibleSpace: Container(
+    decoration: const BoxDecoration(
+      gradient: LinearGradient(
+        colors: [Colors.orangeAccent, Colors.deepOrange],
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
       ),
+    ),
+  ),
+  title: Row(
+    children: [
+      Image.asset('assets/logo.png', height: 36),
+      const SizedBox(width: 10),
+      const Text(
+        "INGRDNTS",
+        style: TextStyle(
+          color: Colors.white,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+    ],
+  ),
+),
+
       body: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
