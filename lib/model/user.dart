@@ -7,6 +7,7 @@ class AppUser {
   final List<String> likedPosts;
   final List<String> followers;
   final List<String> following;
+  final bool isAdmin;
 
   AppUser({
     required this.uid,
@@ -17,6 +18,7 @@ class AppUser {
     required this.likedPosts,
     required this.followers,
     required this.following,
+    this.isAdmin = false,
   });
 
   Map<String, dynamic> toJson() => {
@@ -28,6 +30,7 @@ class AppUser {
     "likedPosts": likedPosts,
     "followers": followers,
     "following": following,
+    "isAdmin": isAdmin,
   };
 
   static AppUser fromJson(Map<String, dynamic> json) => AppUser(
@@ -39,5 +42,6 @@ class AppUser {
     likedPosts: List<String>.from(json["likedPosts"] ?? []),
     followers: List<String>.from(json["followers"] ?? []),
     following: List<String>.from(json["following"] ?? []),
+    isAdmin: json["isAdmin"] ?? false,
   );
 }

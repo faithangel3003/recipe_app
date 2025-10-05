@@ -31,6 +31,7 @@ class Recipe {
   final String category;
   final List<String> likedBy;
   final DateTime createdAt;
+  final bool isHidden;
 
   int get likes => likedBy.length;
 
@@ -48,6 +49,7 @@ class Recipe {
     required this.category,
     required this.likedBy,
     required this.createdAt,
+    this.isHidden = false,
   });
 
   Map<String, dynamic> toJson() => {
@@ -63,7 +65,8 @@ class Recipe {
     'cookingDuration': cookingDuration,
     'category': category,
     'likedBy': likedBy,
-    'createdAt': createdAt.toIso8601String(), // Store as ISO string
+    'createdAt': createdAt.toIso8601String(),
+    'isHidden': isHidden,
   };
 
   factory Recipe.fromJson(Map<String, dynamic> json) {
@@ -109,6 +112,7 @@ class Recipe {
       category: json['category']?.toString() ?? 'Food',
       likedBy: List<String>.from(json['likedBy'] ?? []),
       createdAt: parseCreatedAt(json['createdAt']),
+      isHidden: json['isHidden'] ?? false,
     );
   }
 }

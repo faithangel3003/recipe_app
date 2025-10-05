@@ -90,6 +90,10 @@ class NotificationPage extends StatelessWidget {
                       message = "$fromUser liked your recipe: $recipeTitle";
                     } else if (type == "follow") {
                       message = "$fromUser started following you";
+                    } else if (type == 'hidden') {
+                      message =
+                          data['message'] ??
+                          'Your post was hidden by an admin.';
                     }
 
                     return ListTile(
@@ -106,7 +110,9 @@ class NotificationPage extends StatelessWidget {
                         style: const TextStyle(fontWeight: FontWeight.bold),
                       ),
                       subtitle: Text(message),
-                      trailing: type == "like" && recipeImage.isNotEmpty
+                      trailing:
+                          (type == "like" || type == 'hidden') &&
+                              recipeImage.isNotEmpty
                           ? ClipRRect(
                               borderRadius: BorderRadius.circular(8),
                               child: Image.network(
@@ -123,7 +129,7 @@ class NotificationPage extends StatelessWidget {
                               fromUserImage: fromImage,
                             )
                           : null,
-                      onTap: type == "like"
+                      onTap: (type == "like" || type == 'hidden')
                           ? () async {
                               final recipeId = data["recipeId"] ?? "";
                               if (recipeId.isEmpty) return;
