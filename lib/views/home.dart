@@ -5,6 +5,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../model/recipe.dart';
+import 'other_user_page.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -21,10 +22,31 @@ class _HomePageState extends State<HomePage> {
     return Scaffold(
       appBar: AppBar(
         automaticallyImplyLeading: false,
-        title: const Text(""),
-        backgroundColor: Colors.white,
         elevation: 0,
+        flexibleSpace: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              colors: [Colors.orangeAccent, Colors.deepOrange],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+          ),
+        ),
+        title: Row(
+          children: [
+            Image.asset('assets/logo.png', height: 36),
+            const SizedBox(width: 10),
+            const Text(
+              "INGRDNTS",
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
+        ),
       ),
+
       body: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -426,33 +448,45 @@ class _FoodGridItemState extends State<_FoodGridItem> {
 
             return Padding(
               padding: const EdgeInsets.only(bottom: 6),
-              child: Row(
-                children: [
-                  CircleAvatar(
-                    radius: 14,
-                    backgroundImage:
-                        userData['profileImageUrl'] != null &&
-                            userData['profileImageUrl'].isNotEmpty
-                        ? NetworkImage(userData['profileImageUrl'])
-                        : null,
-                    child:
-                        (userData['profileImageUrl'] == null ||
-                            userData['profileImageUrl'].isEmpty)
-                        ? const Icon(Icons.person, size: 16)
-                        : null,
-                  ),
-                  const SizedBox(width: 6),
-                  Expanded(
-                    child: Text(
-                      userData['username'] ?? "Unknown",
-                      style: const TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w500,
-                      ),
-                      overflow: TextOverflow.ellipsis,
+              child: InkWell(
+                borderRadius: BorderRadius.circular(20),
+                onTap: () {
+                  final authorId = item.authorId;
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => OtherUserProfilePage(userId: authorId),
                     ),
-                  ),
-                ],
+                  );
+                },
+                child: Row(
+                  children: [
+                    CircleAvatar(
+                      radius: 14,
+                      backgroundImage:
+                          userData['profileImageUrl'] != null &&
+                              userData['profileImageUrl'].isNotEmpty
+                          ? NetworkImage(userData['profileImageUrl'])
+                          : null,
+                      child:
+                          (userData['profileImageUrl'] == null ||
+                              userData['profileImageUrl'].isEmpty)
+                          ? const Icon(Icons.person, size: 16)
+                          : null,
+                    ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        userData['username'] ?? "Unknown",
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             );
           },

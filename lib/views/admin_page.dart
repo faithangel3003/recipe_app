@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../model/recipe.dart';
-import '../model/user.dart';
 import 'recipe_detail_page.dart';
 import '../auth/login.dart';
 

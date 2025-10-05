@@ -80,8 +80,7 @@ class NotificationPage extends StatelessWidget {
                     final fromUser = data["fromUsername"] ?? "Someone";
                     final fromImage = data["fromUserImage"] ?? "";
                     final fromUid = data["fromUserId"] ?? "";
-                    final createdAt = (data["createdAt"] as Timestamp?)
-                        ?.toDate();
+                    // createdAt intentionally omitted here; we use timestamps only for grouping above.
                     final recipeImage = data["recipeImage"] ?? "";
                     final recipeTitle = data["recipeTitle"] ?? "";
 

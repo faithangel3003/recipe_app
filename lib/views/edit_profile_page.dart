@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import '../model/user.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -29,7 +30,6 @@ class _EditProfilePageState extends State<EditProfilePage> {
     super.initState();
     _usernameController = TextEditingController(text: widget.user.username);
     _emailController = TextEditingController(text: widget.user.email);
-    // If you add bio in AppUser later, you can also init it here
   }
 
   @override
@@ -45,9 +45,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
     final pickedFile = await picker.pickImage(source: ImageSource.gallery);
 
     if (pickedFile != null) {
-      setState(() {
-        _imageFile = File(pickedFile.path);
-      });
+      setState(() => _imageFile = File(pickedFile.path));
     }
   }
 
@@ -55,7 +53,6 @@ class _EditProfilePageState extends State<EditProfilePage> {
     if (!_formKey.currentState!.validate()) return;
 
     setState(() => _isLoading = true);
-
     String imageUrl = widget.user.profileImageUrl;
 
     if (_imageFile != null) {
@@ -67,11 +64,9 @@ class _EditProfilePageState extends State<EditProfilePage> {
         );
       } catch (e) {
         debugPrint('Profile image upload failed: $e');
-        // proceed without failing the whole save
       }
     }
 
-    // Construct updated user
     final updatedUser = AppUser(
       uid: widget.user.uid,
       username: _usernameController.text.trim(),
@@ -83,39 +78,29 @@ class _EditProfilePageState extends State<EditProfilePage> {
       following: widget.user.following,
       isAdmin: widget.user.isAdmin,
     );
+
     try {
-      // Save to Firestore
       await FirebaseFirestore.instance
           .collection("users")
           .doc(widget.user.uid)
           .set(updatedUser.toJson());
 
-      // Update Firebase Auth profile (displayName / photoURL) if available.
       final authUser = FirebaseAuth.instance.currentUser;
       if (authUser != null) {
-        // Note: changing email may require re-authentication depending on
-        // the Firebase Auth version and security rules. To avoid calling an
-        // unsupported API in this environment, we only update displayName
-        // and photoURL here and surface a message if the email changed.
         if (_emailController.text.trim().isNotEmpty &&
             _emailController.text.trim() != authUser.email) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: const Text(
+            const SnackBar(
+              content: Text(
                 'Email change detected. You may need to re-authenticate to update your email.',
               ),
               backgroundColor: Colors.orange,
             ),
           );
         }
-
-        try {
-          await authUser.updateDisplayName(updatedUser.username);
-          if (imageUrl.isNotEmpty && imageUrl != authUser.photoURL) {
-            await authUser.updatePhotoURL(imageUrl);
-          }
-        } catch (e) {
-          debugPrint('Auth profile update failed: $e');
+        await authUser.updateDisplayName(updatedUser.username);
+        if (imageUrl.isNotEmpty && imageUrl != authUser.photoURL) {
+          await authUser.updatePhotoURL(imageUrl);
         }
       }
 
@@ -137,78 +122,178 @@ class _EditProfilePageState extends State<EditProfilePage> {
 
   @override
   Widget build(BuildContext context) {
+    // Determine the correct ImageProvider: prefer the freshly picked File, else
+    // use NetworkImage for remote URLs and FileImage for local file paths (only on non-web).
+    ImageProvider<Object>? profileImageProvider;
+    if (_imageFile != null) {
+      profileImageProvider = FileImage(_imageFile!);
+    } else if (widget.user.profileImageUrl.isNotEmpty) {
+      final url = widget.user.profileImageUrl;
+      final isNetwork =
+          url.startsWith('http') ||
+          url.startsWith('https') ||
+          url.startsWith('data:');
+      final isLocalPath = RegExp(
+        r'^[A-Za-z]:\\|^[A-Za-z]:/|^/|^file://',
+      ).hasMatch(url);
+
+      if (isNetwork) {
+        profileImageProvider = NetworkImage(url);
+      } else if (!kIsWeb && isLocalPath) {
+        // For Windows paths like C:\Users\... or POSIX /... use FileImage.
+        final cleaned = url.replaceFirst('file://', '');
+        try {
+          profileImageProvider = FileImage(File(cleaned));
+        } catch (e) {
+          profileImageProvider = null;
+        }
+      } else {
+        // As a last resort, try network (it may still fail and show placeholder)
+        profileImageProvider = NetworkImage(url);
+      }
+    }
+
     return Scaffold(
+      backgroundColor: Colors.grey[50],
       appBar: AppBar(
-        title: const Text("Edit Profile"),
+        automaticallyImplyLeading: true,
+        title: const Text(
+          "Edit Profile",
+          style: TextStyle(color: Colors.orange, fontWeight: FontWeight.bold),
+        ),
+        centerTitle: true,
+        backgroundColor: Colors.white,
+        elevation: 1,
+        iconTheme: const IconThemeData(color: Colors.orange),
         actions: [
-          IconButton(icon: const Icon(Icons.check), onPressed: _saveProfile),
+          IconButton(
+            icon: const Icon(Icons.check_circle_outline, color: Colors.orange),
+            onPressed: _saveProfile,
+          ),
         ],
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : Padding(
-              padding: const EdgeInsets.all(16.0),
+          ? const Center(child: CircularProgressIndicator(color: Colors.orange))
+          : SingleChildScrollView(
+              padding: const EdgeInsets.all(20.0),
               child: Form(
                 key: _formKey,
-                child: ListView(
+                child: Column(
                   children: [
-                    Center(
-                      child: GestureDetector(
-                        onTap: _pickImage,
-                        child: CircleAvatar(
-                          radius: 50,
-                          backgroundImage: _imageFile != null
-                              ? FileImage(_imageFile!)
-                              : (widget.user.profileImageUrl.isNotEmpty
-                                        ? NetworkImage(
-                                            widget.user.profileImageUrl,
-                                          )
-                                        : null)
-                                    as ImageProvider<Object>?,
-                          child:
-                              (_imageFile == null &&
-                                  widget.user.profileImageUrl.isEmpty)
-                              ? const Icon(Icons.camera_alt, size: 40)
-                              : null,
-                        ),
+                    // Profile Image
+                    GestureDetector(
+                      onTap: _pickImage,
+                      child: Stack(
+                        alignment: Alignment.bottomRight,
+                        children: [
+                          CircleAvatar(
+                            radius: 55,
+                            backgroundColor: Colors.orange.withOpacity(0.2),
+                            backgroundImage: profileImageProvider,
+                            child: profileImageProvider == null
+                                ? const Icon(
+                                    Icons.person,
+                                    size: 60,
+                                    color: Colors.orange,
+                                  )
+                                : null,
+                          ),
+                          Container(
+                            padding: const EdgeInsets.all(6),
+                            decoration: const BoxDecoration(
+                              color: Colors.orange,
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(
+                              Icons.camera_alt,
+                              size: 20,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                    const SizedBox(height: 20),
+
+                    const SizedBox(height: 30),
+
+                    // Username Field
                     TextFormField(
                       controller: _usernameController,
-                      decoration: const InputDecoration(
-                        labelText: "Username",
-                        border: OutlineInputBorder(),
-                      ),
+                      decoration: _inputDecoration("Username"),
                       validator: (value) => value == null || value.isEmpty
                           ? "Enter a username"
                           : null,
                     ),
                     const SizedBox(height: 20),
+
+                    // Email Field
                     TextFormField(
                       controller: _emailController,
-                      decoration: const InputDecoration(
-                        labelText: "Email",
-                        border: OutlineInputBorder(),
-                      ),
+                      decoration: _inputDecoration("Email"),
                       keyboardType: TextInputType.emailAddress,
                       validator: (value) => value == null || value.isEmpty
                           ? "Enter an email"
                           : null,
                     ),
                     const SizedBox(height: 20),
+
+                    // Bio Field
                     TextFormField(
                       controller: _bioController,
-                      decoration: const InputDecoration(
-                        labelText: "Bio (optional)",
-                        border: OutlineInputBorder(),
-                      ),
+                      decoration: _inputDecoration("Bio (optional)"),
                       maxLines: 3,
+                    ),
+                    const SizedBox(height: 40),
+
+                    // Save Button
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: _saveProfile,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.orange,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          elevation: 3,
+                        ),
+                        child: const Text(
+                          "Save Changes",
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                          ),
+                        ),
+                      ),
                     ),
                   ],
                 ),
               ),
             ),
+    );
+  }
+
+  InputDecoration _inputDecoration(String label) {
+    return InputDecoration(
+      labelText: label,
+      labelStyle: const TextStyle(color: Colors.orange),
+      filled: true,
+      fillColor: Colors.white,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: Colors.orange),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: Colors.orangeAccent),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: Colors.deepOrange, width: 2),
+      ),
     );
   }
 }

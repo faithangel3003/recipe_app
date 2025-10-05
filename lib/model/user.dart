@@ -34,14 +34,28 @@ class AppUser {
   };
 
   static AppUser fromJson(Map<String, dynamic> json) => AppUser(
-    uid: json["uid"],
-    username: json["username"],
-    email: json["email"],
-    profileImageUrl: json["profileImageUrl"],
-    posts: List<String>.from(json["posts"] ?? []),
-    likedPosts: List<String>.from(json["likedPosts"] ?? []),
-    followers: List<String>.from(json["followers"] ?? []),
-    following: List<String>.from(json["following"] ?? []),
+    uid: (json["uid"] as String?) ?? '',
+    username: (json["username"] as String?) ?? '',
+    email: (json["email"] as String?) ?? '',
+    profileImageUrl: (json["profileImageUrl"] as String?) ?? '',
+    posts: (json["posts"] is List)
+        ? List<String>.from((json["posts"] as List).map((e) => e.toString()))
+        : <String>[],
+    likedPosts: (json["likedPosts"] is List)
+        ? List<String>.from(
+            (json["likedPosts"] as List).map((e) => e.toString()),
+          )
+        : <String>[],
+    followers: (json["followers"] is List)
+        ? List<String>.from(
+            (json["followers"] as List).map((e) => e.toString()),
+          )
+        : <String>[],
+    following: (json["following"] is List)
+        ? List<String>.from(
+            (json["following"] as List).map((e) => e.toString()),
+          )
+        : <String>[],
     isAdmin: json["isAdmin"] ?? false,
   );
 }

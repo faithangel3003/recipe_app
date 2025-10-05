@@ -80,7 +80,7 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
 
       setState(() {
         _message =
-            "Password reset email sent to $email.\nCheck your inbox for the reset link.";
+            "Password reset email sent to $email.\nPlease check your inbox.";
       });
     } on FirebaseAuthException catch (e) {
       setState(() => _message = e.message);
@@ -92,50 +92,179 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      // 🔶 Gradient AppBar
       appBar: AppBar(
-        title: const Text("Forgot Password"),
-        backgroundColor: Colors.deepOrange,
+        elevation: 4,
+        backgroundColor: Colors.transparent,
+        flexibleSpace: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              colors: [Color(0xFFFFA726), Color(0xFFFF7043)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+          ),
+        ),
+        title: const Text(
+          "Forgot Password",
+          style: TextStyle(
+            fontSize: 22,
+            fontWeight: FontWeight.w700,
+            color: Colors.white,
+            letterSpacing: 1,
+          ),
+        ),
+        centerTitle: true,
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          children: [
-            TextField(
-              controller: _emailController,
-              decoration: const InputDecoration(
-                labelText: "Email",
-                prefixIcon: Icon(Icons.email_outlined),
+
+      body: Container(
+        width: double.infinity,
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            colors: [Color(0xFFFFF3E0), Color(0xFFFFFFFF)],
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+          ),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 25, vertical: 40),
+          // Make the content scrollable so the keyboard or extra messages don't cause overflow
+          child: GestureDetector(
+            onTap: () => FocusScope.of(context).unfocus(),
+            child: SingleChildScrollView(
+              // add bottom padding to account for keyboard / system insets
+              padding: EdgeInsets.only(
+                bottom: MediaQuery.of(context).viewInsets.bottom + 20,
               ),
-            ),
-            const SizedBox(height: 20),
-            ElevatedButton(
-              onPressed: _isLoading ? null : _sendResetEmail,
-              child: _isLoading
-                  ? const CircularProgressIndicator(color: Colors.white)
-                  : const Text("Send Reset Link"),
-            ),
-            const SizedBox(height: 20),
-            if (kIsWeb)
-              ElevatedButton(
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => const ResetPasswordPage(),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  const Icon(
+                    Icons.lock_reset_rounded,
+                    color: Color(0xFFFF7043),
+                    size: 80,
+                  ),
+                  const SizedBox(height: 15),
+                  const Text(
+                    "Reset Your Password",
+                    style: TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black87,
                     ),
-                  );
-                },
-                child: const Text("Go to Reset Password Page"),
+                  ),
+                  const SizedBox(height: 10),
+                  const Text(
+                    "Enter your registered email address and we’ll send you a link to reset your password.",
+                    style: TextStyle(color: Colors.black54, fontSize: 15),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 35),
+
+                  // 📩 Email Field
+                  TextField(
+                    controller: _emailController,
+                    decoration: InputDecoration(
+                      labelText: "Email Address",
+                      labelStyle: const TextStyle(color: Colors.black54),
+                      prefixIcon: const Icon(
+                        Icons.email_outlined,
+                        color: Colors.orange,
+                      ),
+                      filled: true,
+                      fillColor: Colors.white,
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(30),
+                        borderSide: const BorderSide(
+                          color: Color(0xFFFF7043),
+                          width: 2,
+                        ),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(30),
+                        borderSide: BorderSide(
+                          color: Colors.orange.shade200,
+                          width: 1,
+                        ),
+                      ),
+                    ),
+                    keyboardType: TextInputType.emailAddress,
+                  ),
+
+                  const SizedBox(height: 30),
+
+                  // 🔘 Send Button
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFFFF7043),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(30),
+                        ),
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        elevation: 3,
+                      ),
+                      onPressed: _isLoading ? null : _sendResetEmail,
+                      child: _isLoading
+                          ? const CircularProgressIndicator(color: Colors.white)
+                          : const Text(
+                              "Send Reset Link",
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                    ),
+                  ),
+
+                  const SizedBox(height: 25),
+
+                  if (_message != null)
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 15,
+                        vertical: 10,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.green.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Text(
+                        _message!,
+                        style: const TextStyle(
+                          color: Colors.green,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+
+                  if (kIsWeb) ...[
+                    const SizedBox(height: 25),
+                    TextButton(
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const ResetPasswordPage(),
+                          ),
+                        );
+                      },
+                      child: const Text(
+                        "Go to Reset Password Page",
+                        style: TextStyle(
+                          color: Color(0xFFFF7043),
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
               ),
-            if (_message != null) ...[
-              const SizedBox(height: 20),
-              Text(
-                _message!,
-                style: const TextStyle(color: Colors.green),
-                textAlign: TextAlign.center,
-              ),
-            ],
-          ],
+            ),
+          ),
         ),
       ),
     );

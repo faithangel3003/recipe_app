@@ -3,6 +3,7 @@ import 'package:final_proj/services/user_service.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../model/recipe.dart';
+import 'other_user_page.dart';
 
 class RecipeDetailPage extends StatelessWidget {
   final Recipe recipe;
@@ -84,36 +85,59 @@ class RecipeDetailPage extends StatelessWidget {
                   // Author + likes + FOLLOW BUTTON
                   Row(
                     children: [
-                      CircleAvatar(
-                        radius: 20,
-                        backgroundImage: recipe.authorProfileImage.isNotEmpty
-                            ? NetworkImage(recipe.authorProfileImage)
-                            : null,
-                        child: recipe.authorProfileImage.isEmpty
-                            ? const Icon(Icons.person, size: 20)
-                            : null,
+                      GestureDetector(
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) =>
+                                  OtherUserProfilePage(userId: recipe.authorId),
+                            ),
+                          );
+                        },
+                        child: CircleAvatar(
+                          radius: 20,
+                          backgroundImage: recipe.authorProfileImage.isNotEmpty
+                              ? NetworkImage(recipe.authorProfileImage)
+                              : null,
+                          child: recipe.authorProfileImage.isEmpty
+                              ? const Icon(Icons.person, size: 20)
+                              : null,
+                        ),
                       ),
                       const SizedBox(width: 12),
                       Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              recipe.authorName,
-                              style: const TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 16,
+                        child: GestureDetector(
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => OtherUserProfilePage(
+                                  userId: recipe.authorId,
+                                ),
                               ),
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              '${recipe.likes} Likes',
-                              style: const TextStyle(
-                                color: Colors.grey,
-                                fontSize: 12,
+                            );
+                          },
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                recipe.authorName,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16,
+                                ),
                               ),
-                            ),
-                          ],
+                              const SizedBox(height: 2),
+                              Text(
+                                '${recipe.likes} Likes',
+                                style: const TextStyle(
+                                  color: Colors.grey,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                       const SizedBox(width: 12),

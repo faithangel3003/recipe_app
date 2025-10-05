@@ -1,10 +1,9 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-
-import '../services/follow_and_unfollow_services.dart';
-
 import '../model/recipe.dart';
+import '../services/follow_and_unfollow_services.dart';
 import 'recipe_detail_page.dart';
 
 class OtherUserProfilePage extends StatefulWidget {
@@ -17,24 +16,20 @@ class OtherUserProfilePage extends StatefulWidget {
 }
 
 class _OtherUserProfilePageState extends State<OtherUserProfilePage> {
-  int _selectedIndex = 0;
   final User? _currentUser = FirebaseAuth.instance.currentUser;
   bool _isProcessingFollow = false;
 
   Future<void> _toggleFollow() async {
-    if (_currentUser == null) return;
-    if (_isProcessingFollow) return;
-
+    if (_currentUser == null || _isProcessingFollow) return;
     setState(() => _isProcessingFollow = true);
     final currentUid = _currentUser.uid;
 
     try {
-      // Fetch current user's display info for notification payload
       final currentUserSnap = await FirebaseFirestore.instance
           .collection('users')
           .doc(currentUid)
           .get();
-      final currentUserData = currentUserSnap.data() ?? <String, dynamic>{};
+      final currentUserData = currentUserSnap.data() ?? {};
       final username =
           currentUserData['username'] ?? currentUserData['name'] ?? 'Someone';
       final profileImageUrl =
@@ -58,9 +53,9 @@ class _OtherUserProfilePageState extends State<OtherUserProfilePage> {
         ),
       );
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not update follow status: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error: $e')));
     } finally {
       if (mounted) setState(() => _isProcessingFollow = false);
     }
@@ -69,7 +64,31 @@ class _OtherUserProfilePageState extends State<OtherUserProfilePage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("User Profile")),
+      appBar: AppBar(
+        elevation: 4,
+        backgroundColor: Colors.transparent,
+        flexibleSpace: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              colors: [Color(0xFFFFA726), Color.fromARGB(255, 250, 135, 100)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+          ),
+        ),
+        title: const Text(
+          "User Profile",
+          style: TextStyle(
+            fontSize: 22,
+            fontWeight: FontWeight.w700,
+            color: Colors.white,
+            letterSpacing: 1,
+          ),
+        ),
+        centerTitle: true,
+        iconTheme: const IconThemeData(color: Colors.white),
+      ),
+
       body: StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
         stream: FirebaseFirestore.instance
             .collection("users")
@@ -80,7 +99,7 @@ class _OtherUserProfilePageState extends State<OtherUserProfilePage> {
             return const Center(child: CircularProgressIndicator());
           }
 
-          final userData = snapshot.data?.data() ?? <String, dynamic>{};
+          final userData = snapshot.data?.data() ?? {};
           final name = userData["name"] ?? userData['username'] ?? "Unknown";
           final photoUrl =
               userData["photoUrl"] ?? userData['profileImageUrl'] ?? "";
@@ -94,61 +113,188 @@ class _OtherUserProfilePageState extends State<OtherUserProfilePage> {
           return SingleChildScrollView(
             child: Column(
               children: [
-                const SizedBox(height: 20),
-                CircleAvatar(
-                  radius: 50,
-                  backgroundImage: photoUrl.isNotEmpty
-                      ? NetworkImage(photoUrl)
-                      : null,
-                  child: photoUrl.isEmpty
-                      ? const Icon(Icons.person, size: 50)
-                      : null,
-                ),
-                const SizedBox(height: 10),
-                Text(
-                  name,
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                ElevatedButton(
-                  onPressed: _toggleFollow,
-                  child: Text(isFollowing ? "Unfollow" : "Follow"),
-                ),
-                const SizedBox(height: 20),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                // 🔶 Gradient Header with Profile Info
+                Stack(
                   children: [
-                    _buildStat("Recipes", widget.userId),
-                    Column(
-                      children: [
-                        Text(
-                          "${followers.length}",
-                          style: const TextStyle(fontWeight: FontWeight.bold),
+                    Container(
+                      height: 290,
+                      decoration: const BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [Color(0xFFFFA726), Color(0xFFFF7043)],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
                         ),
-                        const Text("Followers"),
-                      ],
+                      ),
                     ),
-                    Column(
-                      children: [
-                        Text(
-                          "${following.length}",
-                          style: const TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                        const Text("Following"),
-                      ],
+                    Positioned.fill(
+                      child: BackdropFilter(
+                        filter: ImageFilter.blur(sigmaX: 6, sigmaY: 6),
+                        child: Container(color: Colors.black.withOpacity(0.2)),
+                      ),
+                    ),
+                    Positioned.fill(
+                      child: Column(
+                        children: [
+                          const SizedBox(height: 20),
+                          CircleAvatar(
+                            radius: 55,
+                            backgroundColor: Colors.white,
+                            child: CircleAvatar(
+                              radius: 52,
+                              backgroundImage: photoUrl.isNotEmpty
+                                  ? NetworkImage(photoUrl)
+                                  : const NetworkImage(
+                                      "https://via.placeholder.com/150",
+                                    ),
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          Text(
+                            name,
+                            style: const TextStyle(
+                              fontSize: 20,
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          AnimatedContainer(
+                            duration: const Duration(milliseconds: 250),
+                            curve: Curves.easeInOut,
+                            child: ElevatedButton(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: isFollowing
+                                    ? Colors.grey[700]
+                                    : Colors.orange,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(30),
+                                ),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 26,
+                                  vertical: 10,
+                                ),
+                                elevation: 3,
+                              ),
+                              onPressed: _toggleFollow,
+                              child: _isProcessingFollow
+                                  ? const SizedBox(
+                                      width: 18,
+                                      height: 18,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        color: Colors.white,
+                                      ),
+                                    )
+                                  : Text(
+                                      isFollowing ? "Following" : "Follow",
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                            ),
+                          ),
+                          const SizedBox(height: 15),
+
+                          // 📊 Stats Row
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                            children: [
+                              _buildStat("Recipes", widget.userId),
+                              Column(
+                                children: [
+                                  Text(
+                                    "${followers.length}",
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  const Text(
+                                    "Followers",
+                                    style: TextStyle(color: Colors.white70),
+                                  ),
+                                ],
+                              ),
+                              Column(
+                                children: [
+                                  Text(
+                                    "${following.length}",
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  const Text(
+                                    "Following",
+                                    style: TextStyle(color: Colors.white70),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 20),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [_buildTab("Recipes", 0), _buildTab("Liked", 1)],
+
+                // ✨ Transition to recipe section
+                Container(
+                  height: 25,
+                  decoration: const BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.only(
+                      topLeft: Radius.circular(25),
+                      topRight: Radius.circular(25),
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black26,
+                        offset: Offset(0, -2),
+                        blurRadius: 8,
+                      ),
+                    ],
+                  ),
                 ),
-                const SizedBox(height: 12),
-                _buildContent(),
+
+                // 📂 User Recipes Grid
+                Container(
+                  width: double.infinity,
+                  decoration: const BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.only(
+                      topLeft: Radius.circular(25),
+                      topRight: Radius.circular(25),
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black12,
+                        offset: Offset(0, -1),
+                        blurRadius: 6,
+                      ),
+                    ],
+                  ),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 16,
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        "Recipes",
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.black87,
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      _buildRecipeGrid(),
+                    ],
+                  ),
+                ),
               ],
             ),
           );
@@ -167,55 +313,38 @@ class _OtherUserProfilePageState extends State<OtherUserProfilePage> {
         final count = snapshot.hasData ? snapshot.data!.docs.length : 0;
         return Column(
           children: [
-            Text("$count", style: const TextStyle(fontWeight: FontWeight.bold)),
-            Text(label),
+            Text(
+              "$count",
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            Text(label, style: const TextStyle(color: Colors.white70)),
           ],
         );
       },
     );
   }
 
-  Widget _buildTab(String label, int index) {
-    final isSelected = _selectedIndex == index;
-    return GestureDetector(
-      onTap: () => setState(() => _selectedIndex = index),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-        decoration: BoxDecoration(
-          border: Border(
-            bottom: BorderSide(
-              color: isSelected ? Colors.deepOrange : Colors.transparent,
-              width: 2,
-            ),
-          ),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildContent() {
-    final Query<Map<String, dynamic>> query = _selectedIndex == 0
-        ? FirebaseFirestore.instance
-              .collection("recipes")
-              .where("authorId", isEqualTo: widget.userId)
-        : FirebaseFirestore.instance
-              .collection("recipes")
-              .where("likedBy", arrayContains: widget.userId);
-
+  Widget _buildRecipeGrid() {
     return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-      stream: query.snapshots(),
+      stream: FirebaseFirestore.instance
+          .collection("recipes")
+          .where("authorId", isEqualTo: widget.userId)
+          .snapshots(),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator());
         }
         if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-          return const Center(child: Text("No recipes found"));
+          return const Padding(
+            padding: EdgeInsets.all(20),
+            child: Text(
+              "No recipes found",
+              style: TextStyle(color: Colors.grey),
+            ),
+          );
         }
 
         final docs = snapshot.data!.docs;
@@ -223,17 +352,17 @@ class _OtherUserProfilePageState extends State<OtherUserProfilePage> {
         return GridView.builder(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
+          padding: const EdgeInsets.all(10),
           gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: 2,
-            childAspectRatio: 0.9,
+            crossAxisSpacing: 12,
+            mainAxisSpacing: 20,
+            childAspectRatio: 1.00,
           ),
           itemCount: docs.length,
           itemBuilder: (context, index) {
-            final doc = docs[index];
-            final raw = doc.data();
-            final data = Map<String, dynamic>.from(raw);
-            data['id'] = doc.id;
-            final recipe = Recipe.fromJson(data);
+            final data = docs[index].data();
+            final recipe = Recipe.fromJson({...data, 'id': docs[index].id});
 
             return GestureDetector(
               onTap: () {
@@ -244,30 +373,53 @@ class _OtherUserProfilePageState extends State<OtherUserProfilePage> {
                   ),
                 );
               },
-              child: Card(
-                child: Column(
-                  children: [
-                    Expanded(
-                      child: recipe.coverImageUrl.isNotEmpty
-                          ? Image.network(
-                              recipe.coverImageUrl,
-                              fit: BoxFit.cover,
-                              width: double.infinity,
-                            )
-                          : Container(
-                              color: Colors.grey.shade200,
-                              width: double.infinity,
-                              child: const Icon(Icons.image),
-                            ),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.all(8),
-                      child: Text(
-                        recipe.title,
-                        overflow: TextOverflow.ellipsis,
-                      ),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                curve: Curves.easeInOut,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(15),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.08),
+                      blurRadius: 6,
+                      offset: const Offset(0, 3),
                     ),
                   ],
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(15),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: recipe.coverImageUrl.isNotEmpty
+                            ? Image.network(
+                                recipe.coverImageUrl,
+                                fit: BoxFit.cover,
+                                width: double.infinity,
+                              )
+                            : Container(
+                                color: Colors.grey.shade200,
+                                child: const Center(
+                                  child: Icon(Icons.image, color: Colors.grey),
+                                ),
+                              ),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.all(8.0),
+                        child: Text(
+                          recipe.title,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                            color: Colors.black87,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             );
