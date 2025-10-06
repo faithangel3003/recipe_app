@@ -47,20 +47,16 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
     try {
       Uri uri = Uri.parse(rawLink);
 
-      // 🔍 Step 1: Detect if it's a wrapped Firebase redirect link
       if (uri.queryParameters.containsKey('link')) {
-        // Decode the inner "link" parameter
         uri = Uri.parse(Uri.decodeFull(uri.queryParameters['link']!));
       }
 
-      // 🔍 Step 2: Extract oobCode
       final oobCode = uri.queryParameters['oobCode'];
       if (oobCode == null || oobCode.isEmpty) {
         setState(() => _error = "Invalid or expired link (missing oobCode)");
         return;
       }
 
-      // 🔑 Step 3: Confirm password reset
       await FirebaseAuth.instance.confirmPasswordReset(
         code: oobCode,
         newPassword: newPassword,
@@ -86,95 +82,162 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
 
   @override
   Widget build(BuildContext context) {
+    final screen = MediaQuery.of(context).size;
+
     return Scaffold(
-      appBar: AppBar(
-        title: const Text("Reset Password"),
-        backgroundColor: Colors.deepOrange,
-      ),
-      body: Padding(
-        padding: const EdgeInsets.all(30),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              "Reset Your Password",
-              style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 10),
-            const Text(
-              "Paste the reset link and enter a new password.",
-              style: TextStyle(color: Colors.grey),
-            ),
-            const SizedBox(height: 30),
+      backgroundColor: Colors.white,
+      body: Center(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 50),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              // App icon or logo area
+              Icon(
+                Icons.lock_reset_rounded,
+                color: Colors.deepOrange,
+                size: screen.width * 0.2,
+              ),
+              const SizedBox(height: 20),
 
-            TextField(
-              controller: _linkController,
-              decoration: InputDecoration(
-                prefixIcon: const Icon(Icons.link),
-                hintText: "Paste reset link here",
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(30),
+              const Text(
+                "Reset Password",
+                style: TextStyle(
+                  fontSize: 28,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.deepOrange,
                 ),
               ),
-            ),
-            const SizedBox(height: 20),
+              const SizedBox(height: 10),
 
-            TextField(
-              controller: _passwordController,
-              obscureText: true,
-              decoration: InputDecoration(
-                prefixIcon: const Icon(Icons.lock),
-                hintText: "New Password",
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(30),
-                ),
+              const Text(
+                "Enter your new password to regain access to your account.",
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Colors.grey, fontSize: 15),
               ),
-            ),
-            const SizedBox(height: 20),
+              const SizedBox(height: 30),
 
-            TextField(
-              controller: _confirmController,
-              obscureText: true,
-              decoration: InputDecoration(
-                prefixIcon: const Icon(Icons.lock_outline),
-                hintText: "Confirm Password",
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(30),
+              // Card-like container
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 25,
                 ),
-              ),
-            ),
-            const SizedBox(height: 20),
-
-            if (_error != null)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 10),
-                child: Text(_error!, style: const TextStyle(color: Colors.red)),
-              ),
-
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: _isLoading ? null : _resetPassword,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.deepOrange,
-                  padding: const EdgeInsets.symmetric(vertical: 15),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(30),
-                  ),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(20),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.deepOrange.withOpacity(0.15),
+                      blurRadius: 15,
+                      offset: const Offset(0, 5),
+                    ),
+                  ],
                 ),
-                child: _isLoading
-                    ? const CircularProgressIndicator(color: Colors.white)
-                    : const Text(
-                        "Reset Password",
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
+                child: Column(
+                  children: [
+                    TextField(
+                      controller: _linkController,
+                      decoration: InputDecoration(
+                        prefixIcon: const Icon(Icons.link),
+                        labelText: "Reset Link",
+                        filled: true,
+                        fillColor: Colors.orange.shade50,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(30),
+                          borderSide: BorderSide.none,
                         ),
                       ),
+                    ),
+                    const SizedBox(height: 20),
+
+                    TextField(
+                      controller: _passwordController,
+                      obscureText: true,
+                      decoration: InputDecoration(
+                        prefixIcon: const Icon(Icons.lock),
+                        labelText: "New Password",
+                        filled: true,
+                        fillColor: Colors.orange.shade50,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(30),
+                          borderSide: BorderSide.none,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+
+                    TextField(
+                      controller: _confirmController,
+                      obscureText: true,
+                      decoration: InputDecoration(
+                        prefixIcon: const Icon(Icons.lock_outline),
+                        labelText: "Confirm Password",
+                        filled: true,
+                        fillColor: Colors.orange.shade50,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(30),
+                          borderSide: BorderSide.none,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 15),
+
+                    if (_error != null)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 10),
+                        child: Text(
+                          _error!,
+                          style: const TextStyle(color: Colors.red),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+
+                    // Reset button
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: _isLoading ? null : _resetPassword,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.deepOrange,
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(30),
+                          ),
+                          elevation: 3,
+                        ),
+                        child: _isLoading
+                            ? const CircularProgressIndicator(
+                                color: Colors.white,
+                              )
+                            : const Text(
+                                "Reset Password",
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                ),
+                              ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
-          ],
+              const SizedBox(height: 40),
+
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text(
+                  "Back to Login",
+                  style: TextStyle(
+                    color: Colors.deepOrange,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 16,
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
