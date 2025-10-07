@@ -55,7 +55,7 @@ class _ProfilePageState extends State<ProfilePage> {
   flexibleSpace: Container(
     decoration: const BoxDecoration(
       gradient: LinearGradient(
-        colors: [Color(0xFFFFA726), Color(0xFFFF7043)], // 🔶 same soft orange gradient
+        colors: [Color(0xFFFFA726), Color(0xFFFF7043)], // soft orange gradient
         begin: Alignment.topLeft,
         end: Alignment.bottomRight,
       ),
@@ -101,62 +101,67 @@ class _ProfilePageState extends State<ProfilePage> {
   ],
 ),
 
-body: SingleChildScrollView(
-  child: Column(
-    children: [
-      // 🟠 Gradient Header (no image anymore)
-      Stack(
-        children: [
-          Container(
-            height: 290,
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                colors: [Color(0xFFFFA726), Color(0xFFFF7043)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-            ),
-          ),
-          Positioned.fill(
-            child: Container(color: Colors.black.withOpacity(0.15)), // slight overlay for depth
-          ),
-          Positioned.fill(
-            child: Column(
+      body: SingleChildScrollView(
+        child: Column(
+          children: [
+            // 🖼 Header with blurred background
+            Stack(
               children: [
-                const SizedBox(height: 20),
-
-                // 🧡 Profile Picture + Edit Button
-                Stack(
-                  alignment: Alignment.center,
-                  children: [
-                    CircleAvatar(
-                      radius: 55,
-                      backgroundColor: Colors.white,
-                      child: CircleAvatar(
-                        radius: 52,
-                        backgroundImage: user?.photoURL != null
-                            ? NetworkImage(user!.photoURL!)
-                            : const NetworkImage("https://via.placeholder.com/150"),
-                      ),
+                Container(
+                  height: 290,
+                  decoration: const BoxDecoration(
+                    image: DecorationImage(
+                      image: AssetImage('assets/backgroundpic.jpg'),
+                      fit: BoxFit.cover,
                     ),
-                    Positioned(
-                      right: MediaQuery.of(context).size.width / 2 - 70,
-                      bottom: 4,
-                      child: GestureDetector(
-                        onTap: _pickImage,
-                        child: Container(
-                          decoration: BoxDecoration(
-                            color: Colors.orange,
-                            shape: BoxShape.circle,
-                            border: Border.all(color: Colors.white, width: 2),
-                          ),
-                          padding: const EdgeInsets.all(6),
-                          child: const Icon(Icons.add, color: Colors.white, size: 22),
-                        ),
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
+                Positioned.fill(
+                  child: BackdropFilter(
+                    filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                    child: Container(color: Colors.black.withOpacity(0.4)),
+                  ),
+                ),
+                Positioned.fill(
+                  child: Column(
+                    children: [
+                      const SizedBox(height: 20),
+
+                      // Profile Picture with Edit Button
+                      Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          CircleAvatar(
+                            radius: 55,
+                            backgroundColor: Colors.white,
+                            child: CircleAvatar(
+                              radius: 52,
+                              backgroundImage: user?.photoURL != null
+                                  ? NetworkImage(user!.photoURL!)
+                                  : const NetworkImage(
+                                      "https://via.placeholder.com/150"),
+                            ),
+                          ),
+                          Positioned(
+                            right: MediaQuery.of(context).size.width / 2 - 70,
+                            bottom: 4,
+                            child: GestureDetector(
+                              onTap: _pickImage,
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  color: Colors.orange,
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
+                                      color: Colors.white, width: 2),
+                                ),
+                                padding: const EdgeInsets.all(6),
+                                child: const Icon(Icons.add,
+                                    color: Colors.white, size: 22),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
 
                       const SizedBox(height: 10),
 
@@ -291,18 +296,29 @@ body: SingleChildScrollView(
       ),
     );
   }
-   Widget _statItem(String label, int count) {
-    return Column(
-      children: [
-        Text(
-          count.toString(),
-          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+  Widget _statItem(String label, int count) {
+  return Column(
+    children: [
+      Text(
+        count.toString(),
+        style: const TextStyle(
+          fontWeight: FontWeight.bold,
+          fontSize: 16,
+          color: Colors.white, // ✅ Make the numbers white
         ),
-        const SizedBox(height: 4),
-        Text(label, style: const TextStyle(color: Colors.grey, fontSize: 14)),
-      ],
-    );
-  }
+      ),
+      const SizedBox(height: 4),
+      Text(
+        label,
+        style: const TextStyle(
+          color: Colors.grey, // label stays grey for contrast
+          fontSize: 14,
+        ),
+      ),
+    ],
+  );
+}
+
   Widget _tabButton(String text, int index) {
     final isSelected = _selectedIndex == index;
     return GestureDetector(
@@ -687,3 +703,5 @@ class _ProfileRecipeCardState extends State<_ProfileRecipeCard> {
     );
   }
 }
+
+

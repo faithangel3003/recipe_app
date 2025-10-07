@@ -28,7 +28,24 @@ class NotificationPage extends StatelessWidget {
     final currentUid = FirebaseAuth.instance.currentUser!.uid;
 
     return Scaffold(
-      appBar: AppBar(title: const Text("Notifications")),
+      appBar: AppBar(
+  backgroundColor: Colors.white,
+  elevation: 1,
+  iconTheme: const IconThemeData(color: Colors.orange),
+  title: Row(
+    children: [
+      Image.asset('assets/logo.png', height: 35), // your logo
+      const SizedBox(width: 10),
+      const Text(
+        "Notifications",
+        style: TextStyle(
+          color: Colors.orange,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+    ],
+  ),
+),
       body: StreamBuilder<QuerySnapshot>(
         stream: FirebaseFirestore.instance
             .collection("notifications")
