@@ -8,8 +8,7 @@ import 'recipe_detail_page.dart';
 
 class OtherUserProfilePage extends StatefulWidget {
   final String userId;
-  const OtherUserProfilePage({Key? key, required this.userId})
-    : super(key: key);
+  const OtherUserProfilePage({Key? key, required this.userId}) : super(key: key);
 
   @override
   _OtherUserProfilePageState createState() => _OtherUserProfilePageState();
@@ -22,9 +21,10 @@ class _OtherUserProfilePageState extends State<OtherUserProfilePage> {
   Future<void> _toggleFollow() async {
     if (_currentUser == null || _isProcessingFollow) return;
     setState(() => _isProcessingFollow = true);
-    final currentUid = _currentUser.uid;
+    final currentUid = _currentUser!.uid;
 
     try {
+<<<<<<< HEAD
       final currentUserSnap = await FirebaseFirestore.instance
           .collection('users')
           .doc(currentUid)
@@ -36,26 +36,27 @@ class _OtherUserProfilePageState extends State<OtherUserProfilePage> {
           currentUserData['photoUrl'] ??
           currentUserData['profileImageUrl'] ??
           '';
+=======
+      final currentUserSnap = await FirebaseFirestore.instance.collection('users').doc(currentUid).get();
+      final currentUserData = currentUserSnap.data() ?? {};
+      final username = currentUserData['username'] ?? currentUserData['name'] ?? 'Someone';
+      final profileImageUrl = currentUserData['photoUrl'] ?? currentUserData['profileImageUrl'] ?? '';
+>>>>>>> d0f7ac37ecece3b8c586e7220e09cb5937492c0c
 
       final service = FollowService();
-      final nowFollowing = await service.toggleFollow(
-        currentUid,
-        widget.userId,
-        username,
-        profileImageUrl,
-      );
+      final nowFollowing = await service.toggleFollow(currentUid, widget.userId, username, profileImageUrl);
 
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            nowFollowing ? 'Followed $username' : 'Unfollowed $username',
-          ),
-        ),
+        SnackBar(content: Text(nowFollowing ? 'Followed $username' : 'Unfollowed $username')),
       );
     } catch (e) {
+<<<<<<< HEAD
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text('Error: $e')));
+=======
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+>>>>>>> d0f7ac37ecece3b8c586e7220e09cb5937492c0c
     } finally {
       if (mounted) setState(() => _isProcessingFollow = false);
     }
@@ -90,10 +91,7 @@ class _OtherUserProfilePageState extends State<OtherUserProfilePage> {
       ),
 
       body: StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-        stream: FirebaseFirestore.instance
-            .collection("users")
-            .doc(widget.userId)
-            .snapshots(),
+        stream: FirebaseFirestore.instance.collection("users").doc(widget.userId).snapshots(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
@@ -101,14 +99,12 @@ class _OtherUserProfilePageState extends State<OtherUserProfilePage> {
 
           final userData = snapshot.data?.data() ?? {};
           final name = userData["name"] ?? userData['username'] ?? "Unknown";
-          final photoUrl =
-              userData["photoUrl"] ?? userData['profileImageUrl'] ?? "";
+          final photoUrl = userData["photoUrl"] ?? userData['profileImageUrl'] ?? "";
           final followers = List.from(userData["followers"] ?? []);
           final following = List.from(userData["following"] ?? []);
 
           final currentUid = _currentUser?.uid;
-          final isFollowing =
-              currentUid != null && followers.contains(currentUid);
+          final isFollowing = currentUid != null && followers.contains(currentUid);
 
           return SingleChildScrollView(
             child: Column(
@@ -143,9 +139,13 @@ class _OtherUserProfilePageState extends State<OtherUserProfilePage> {
                               radius: 52,
                               backgroundImage: photoUrl.isNotEmpty
                                   ? NetworkImage(photoUrl)
+<<<<<<< HEAD
                                   : const NetworkImage(
                                       "https://via.placeholder.com/150",
                                     ),
+=======
+                                  : const NetworkImage("https://via.placeholder.com/150"),
+>>>>>>> d0f7ac37ecece3b8c586e7220e09cb5937492c0c
                             ),
                           ),
                           const SizedBox(height: 10),
@@ -163,6 +163,7 @@ class _OtherUserProfilePageState extends State<OtherUserProfilePage> {
                             curve: Curves.easeInOut,
                             child: ElevatedButton(
                               style: ElevatedButton.styleFrom(
+<<<<<<< HEAD
                                 backgroundColor: isFollowing
                                     ? Colors.grey[700]
                                     : Colors.orange,
@@ -173,11 +174,19 @@ class _OtherUserProfilePageState extends State<OtherUserProfilePage> {
                                   horizontal: 26,
                                   vertical: 10,
                                 ),
+=======
+                                backgroundColor: isFollowing ? Colors.grey[700] : Colors.orange,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(30),
+                                ),
+                                padding: const EdgeInsets.symmetric(horizontal: 26, vertical: 10),
+>>>>>>> d0f7ac37ecece3b8c586e7220e09cb5937492c0c
                                 elevation: 3,
                               ),
                               onPressed: _toggleFollow,
                               child: _isProcessingFollow
                                   ? const SizedBox(
+<<<<<<< HEAD
                                       width: 18,
                                       height: 18,
                                       child: CircularProgressIndicator(
@@ -191,6 +200,12 @@ class _OtherUserProfilePageState extends State<OtherUserProfilePage> {
                                         color: Colors.white,
                                         fontWeight: FontWeight.w600,
                                       ),
+=======
+                                      width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                                  : Text(
+                                      isFollowing ? "Following" : "Follow",
+                                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+>>>>>>> d0f7ac37ecece3b8c586e7220e09cb5937492c0c
                                     ),
                             ),
                           ),
@@ -203,6 +218,7 @@ class _OtherUserProfilePageState extends State<OtherUserProfilePage> {
                               _buildStat("Recipes", widget.userId),
                               Column(
                                 children: [
+<<<<<<< HEAD
                                   Text(
                                     "${followers.length}",
                                     style: const TextStyle(
@@ -214,10 +230,16 @@ class _OtherUserProfilePageState extends State<OtherUserProfilePage> {
                                     "Followers",
                                     style: TextStyle(color: Colors.white70),
                                   ),
+=======
+                                  Text("${followers.length}",
+                                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                                  const Text("Followers", style: TextStyle(color: Colors.white70)),
+>>>>>>> d0f7ac37ecece3b8c586e7220e09cb5937492c0c
                                 ],
                               ),
                               Column(
                                 children: [
+<<<<<<< HEAD
                                   Text(
                                     "${following.length}",
                                     style: const TextStyle(
@@ -229,6 +251,11 @@ class _OtherUserProfilePageState extends State<OtherUserProfilePage> {
                                     "Following",
                                     style: TextStyle(color: Colors.white70),
                                   ),
+=======
+                                  Text("${following.length}",
+                                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                                  const Text("Following", style: TextStyle(color: Colors.white70)),
+>>>>>>> d0f7ac37ecece3b8c586e7220e09cb5937492c0c
                                 ],
                               ),
                             ],
@@ -249,11 +276,15 @@ class _OtherUserProfilePageState extends State<OtherUserProfilePage> {
                       topRight: Radius.circular(25),
                     ),
                     boxShadow: [
+<<<<<<< HEAD
                       BoxShadow(
                         color: Colors.black26,
                         offset: Offset(0, -2),
                         blurRadius: 8,
                       ),
+=======
+                      BoxShadow(color: Colors.black26, offset: Offset(0, -2), blurRadius: 8),
+>>>>>>> d0f7ac37ecece3b8c586e7220e09cb5937492c0c
                     ],
                   ),
                 ),
@@ -268,6 +299,7 @@ class _OtherUserProfilePageState extends State<OtherUserProfilePage> {
                       topRight: Radius.circular(25),
                     ),
                     boxShadow: [
+<<<<<<< HEAD
                       BoxShadow(
                         color: Colors.black12,
                         offset: Offset(0, -1),
@@ -279,6 +311,12 @@ class _OtherUserProfilePageState extends State<OtherUserProfilePage> {
                     horizontal: 12,
                     vertical: 16,
                   ),
+=======
+                      BoxShadow(color: Colors.black12, offset: Offset(0, -1), blurRadius: 6),
+                    ],
+                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+>>>>>>> d0f7ac37ecece3b8c586e7220e09cb5937492c0c
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -305,14 +343,12 @@ class _OtherUserProfilePageState extends State<OtherUserProfilePage> {
 
   Widget _buildStat(String label, String userId) {
     return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-      stream: FirebaseFirestore.instance
-          .collection("recipes")
-          .where("authorId", isEqualTo: userId)
-          .snapshots(),
+      stream: FirebaseFirestore.instance.collection("recipes").where("authorId", isEqualTo: userId).snapshots(),
       builder: (context, snapshot) {
         final count = snapshot.hasData ? snapshot.data!.docs.length : 0;
         return Column(
           children: [
+<<<<<<< HEAD
             Text(
               "$count",
               style: const TextStyle(
@@ -320,6 +356,9 @@ class _OtherUserProfilePageState extends State<OtherUserProfilePage> {
                 fontWeight: FontWeight.bold,
               ),
             ),
+=======
+            Text("$count", style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+>>>>>>> d0f7ac37ecece3b8c586e7220e09cb5937492c0c
             Text(label, style: const TextStyle(color: Colors.white70)),
           ],
         );
@@ -329,10 +368,14 @@ class _OtherUserProfilePageState extends State<OtherUserProfilePage> {
 
   Widget _buildRecipeGrid() {
     return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+<<<<<<< HEAD
       stream: FirebaseFirestore.instance
           .collection("recipes")
           .where("authorId", isEqualTo: widget.userId)
           .snapshots(),
+=======
+      stream: FirebaseFirestore.instance.collection("recipes").where("authorId", isEqualTo: widget.userId).snapshots(),
+>>>>>>> d0f7ac37ecece3b8c586e7220e09cb5937492c0c
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator());
@@ -340,10 +383,14 @@ class _OtherUserProfilePageState extends State<OtherUserProfilePage> {
         if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
           return const Padding(
             padding: EdgeInsets.all(20),
+<<<<<<< HEAD
             child: Text(
               "No recipes found",
               style: TextStyle(color: Colors.grey),
             ),
+=======
+            child: Text("No recipes found", style: TextStyle(color: Colors.grey)),
+>>>>>>> d0f7ac37ecece3b8c586e7220e09cb5937492c0c
           );
         }
 
@@ -368,9 +415,7 @@ class _OtherUserProfilePageState extends State<OtherUserProfilePage> {
               onTap: () {
                 Navigator.push(
                   context,
-                  MaterialPageRoute(
-                    builder: (_) => RecipeDetailPage(recipe: recipe),
-                  ),
+                  MaterialPageRoute(builder: (_) => RecipeDetailPage(recipe: recipe)),
                 );
               },
               child: AnimatedContainer(
@@ -394,6 +439,7 @@ class _OtherUserProfilePageState extends State<OtherUserProfilePage> {
                     children: [
                       Expanded(
                         child: recipe.coverImageUrl.isNotEmpty
+<<<<<<< HEAD
                             ? Image.network(
                                 recipe.coverImageUrl,
                                 fit: BoxFit.cover,
@@ -404,6 +450,12 @@ class _OtherUserProfilePageState extends State<OtherUserProfilePage> {
                                 child: const Center(
                                   child: Icon(Icons.image, color: Colors.grey),
                                 ),
+=======
+                            ? Image.network(recipe.coverImageUrl, fit: BoxFit.cover, width: double.infinity)
+                            : Container(
+                                color: Colors.grey.shade200,
+                                child: const Center(child: Icon(Icons.image, color: Colors.grey)),
+>>>>>>> d0f7ac37ecece3b8c586e7220e09cb5937492c0c
                               ),
                       ),
                       Padding(

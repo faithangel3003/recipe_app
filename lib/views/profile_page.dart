@@ -55,7 +55,11 @@ class _ProfilePageState extends State<ProfilePage> {
   flexibleSpace: Container(
     decoration: const BoxDecoration(
       gradient: LinearGradient(
+<<<<<<< HEAD
         colors: [Color(0xFFFFA726), Color(0xFFFF7043)], // 🔶 same soft orange gradient
+=======
+        colors: [Color(0xFFFFA726), Color(0xFFFF7043)], // soft orange gradient
+>>>>>>> d0f7ac37ecece3b8c586e7220e09cb5937492c0c
         begin: Alignment.topLeft,
         end: Alignment.bottomRight,
       ),
@@ -101,6 +105,7 @@ class _ProfilePageState extends State<ProfilePage> {
   ],
 ),
 
+<<<<<<< HEAD
 body: SingleChildScrollView(
   child: Column(
     children: [
@@ -157,6 +162,69 @@ body: SingleChildScrollView(
                     ),
                   ],
                 ),
+=======
+      body: SingleChildScrollView(
+        child: Column(
+          children: [
+            // 🖼 Header with blurred background
+            Stack(
+              children: [
+                Container(
+                  height: 290,
+                  decoration: const BoxDecoration(
+                    image: DecorationImage(
+                      image: AssetImage('assets/backgroundpic.jpg'),
+                      fit: BoxFit.cover,
+                    ),
+                  ),
+                ),
+                Positioned.fill(
+                  child: BackdropFilter(
+                    filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                    child: Container(color: Colors.black.withOpacity(0.4)),
+                  ),
+                ),
+                Positioned.fill(
+                  child: Column(
+                    children: [
+                      const SizedBox(height: 20),
+
+                      // Profile Picture with Edit Button
+                      Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          CircleAvatar(
+                            radius: 55,
+                            backgroundColor: Colors.white,
+                            child: CircleAvatar(
+                              radius: 52,
+                              backgroundImage: user?.photoURL != null
+                                  ? NetworkImage(user!.photoURL!)
+                                  : const NetworkImage(
+                                      "https://via.placeholder.com/150"),
+                            ),
+                          ),
+                          Positioned(
+                            right: MediaQuery.of(context).size.width / 2 - 70,
+                            bottom: 4,
+                            child: GestureDetector(
+                              onTap: _pickImage,
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  color: Colors.orange,
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
+                                      color: Colors.white, width: 2),
+                                ),
+                                padding: const EdgeInsets.all(6),
+                                child: const Icon(Icons.add,
+                                    color: Colors.white, size: 22),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+>>>>>>> d0f7ac37ecece3b8c586e7220e09cb5937492c0c
 
                       const SizedBox(height: 10),
 
@@ -291,6 +359,7 @@ body: SingleChildScrollView(
       ),
     );
   }
+<<<<<<< HEAD
    Widget _statItem(String label, int count) {
     return Column(
       children: [
@@ -303,6 +372,31 @@ body: SingleChildScrollView(
       ],
     );
   }
+=======
+  Widget _statItem(String label, int count) {
+  return Column(
+    children: [
+      Text(
+        count.toString(),
+        style: const TextStyle(
+          fontWeight: FontWeight.bold,
+          fontSize: 16,
+          color: Colors.white, // ✅ Make the numbers white
+        ),
+      ),
+      const SizedBox(height: 4),
+      Text(
+        label,
+        style: const TextStyle(
+          color: Colors.grey, // label stays grey for contrast
+          fontSize: 14,
+        ),
+      ),
+    ],
+  );
+}
+
+>>>>>>> d0f7ac37ecece3b8c586e7220e09cb5937492c0c
   Widget _tabButton(String text, int index) {
     final isSelected = _selectedIndex == index;
     return GestureDetector(
@@ -687,3 +781,5 @@ class _ProfileRecipeCardState extends State<_ProfileRecipeCard> {
     );
   }
 }
+
+
