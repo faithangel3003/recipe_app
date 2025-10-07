@@ -21,6 +21,22 @@ class RecipeDetailPage extends StatelessWidget {
     }
     final currentUid = currentUser.uid;
 
+    // If recipe is archived and current user is not the author, block access
+    if (recipe.isArchived && recipe.authorId != currentUid) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Recipe Unavailable')),
+        body: const Center(
+          child: Padding(
+            padding: EdgeInsets.all(24.0),
+            child: Text(
+              'This recipe has been archived by an admin and is not available.',
+              textAlign: TextAlign.center,
+            ),
+          ),
+        ),
+      );
+    }
+
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       try {
         await UserService().ensureUserDocumentExists(

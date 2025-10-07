@@ -2,10 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../model/recipe.dart';
-<<<<<<< HEAD
-=======
-import '../model/user.dart'; // Assuming you have a User model if needed elsewhere
->>>>>>> d0f7ac37ecece3b8c586e7220e09cb5937492c0c
 import 'recipe_detail_page.dart';
 import '../auth/login.dart';
 
@@ -18,8 +14,9 @@ class AdminPage extends StatefulWidget {
 
 class _AdminPageState extends State<AdminPage> {
   bool _showHidden = false;
+  bool _viewArchived =
+      false; // when true show archived recipes instead of active/hidden
 
-  // Function to toggle the hidden status of a recipe and send notification
   Future<void> _toggleHideRecipe(Recipe recipe) async {
     try {
       final newHidden = !recipe.isHidden;
@@ -28,7 +25,6 @@ class _AdminPageState extends State<AdminPage> {
           .doc(recipe.id)
           .update({'isHidden': newHidden});
 
-      // Send a notification to the recipe author when their post is hidden/unhidden
       try {
         if (recipe.authorId.isNotEmpty) {
           final admin = FirebaseAuth.instance.currentUser;
@@ -62,99 +58,189 @@ class _AdminPageState extends State<AdminPage> {
         debugPrint('Failed to send hide/unhide notification: $e');
       }
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(newHidden ? 'Recipe hidden' : 'Recipe unhidden'),
-          backgroundColor: Colors.green,
-        ),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(newHidden ? 'Recipe hidden' : 'Recipe unhidden'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+        );
+      }
     }
   }
 
-  // Function to delete a recipe and send notification
- Future<void> _deleteRecipe(Recipe recipe) async {
-  final confirm = await showDialog<bool>(
-    context: context,
-    builder: (context) => AlertDialog(
-      title: const Text('Confirm Delete'),
-      content: Text(
-        'Are you sure you want to delete "${recipe.title}"? This action cannot be undone.',
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context, false),
-          child: const Text('CANCEL'),
-        ),
-        TextButton(
-          onPressed: () => Navigator.pop(context, true),
-          style: TextButton.styleFrom(foregroundColor: Colors.red),
-          child: const Text('DELETE'),
-        ),
-      ],
-    ),
-  );
+  Future<void> _restoreRecipe(Recipe recipe) async {
+    try {
+      await FirebaseFirestore.instance
+          .collection('recipes')
+          .doc(recipe.id)
+          .update({'isArchived': false});
 
-  if (confirm != true) return;
+      try {
+        if (recipe.authorId.isNotEmpty) {
+          final admin = FirebaseAuth.instance.currentUser;
+          final adminId = admin?.uid ?? '';
+          final adminName = admin?.displayName ?? 'Admin';
+          final adminImage = admin?.photoURL ?? '';
+          await FirebaseFirestore.instance
+              .collection('notifications')
+              .doc(recipe.authorId)
+              .collection('items')
+              .add({
+                'type': 'unarchived',
+                'fromUserId': adminId,
+                'fromUsername': adminName,
+                'fromUserImage': adminImage,
+                'recipeId': recipe.id,
+                'recipeTitle': recipe.title,
+                'recipeImage': recipe.coverImageUrl,
+                'message':
+                    'Your post "${recipe.title}" was restored by an admin.',
+                'createdAt': FieldValue.serverTimestamp(),
+              });
+        }
+      } catch (e) {
+        debugPrint('Failed to send unarchive notification: $e');
+      }
 
-  try {
-    final admin = FirebaseAuth.instance.currentUser;
-    final adminId = admin?.uid ?? '';
-    final adminName = admin?.displayName ?? 'Admin';
-    final adminImage = admin?.photoURL ?? '';
-
-    // ✅ Create notification *before* deletion
-    if (recipe.authorId.isNotEmpty) {
-      final notifRef = FirebaseFirestore.instance
-          .collection('notifications')
-          .doc(recipe.authorId)
-          .collection('items')
-          .doc();
-
-      await notifRef.set({
-        'type': 'deleted', // ✅ Notification type
-        'fromUserId': adminId,
-        'fromUsername': adminName,
-        'fromUserImage': adminImage,
-        'recipeId': recipe.id,
-        'recipeTitle': recipe.title,
-        'recipeImage': recipe.coverImageUrl,
-        'message':
-            'Your post "${recipe.title}" has been deleted by the admin for violating community guidelines.',
-        'createdAt': FieldValue.serverTimestamp(),
-      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Recipe restored'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error restoring recipe: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
-
-    // ✅ Delete recipe AFTER sending notification
-    await FirebaseFirestore.instance
-        .collection('recipes')
-        .doc(recipe.id)
-        .delete();
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Recipe deleted successfully'),
-        backgroundColor: Colors.green,
-      ),
-    );
-  } catch (e) {
-    debugPrint('Error deleting recipe: $e');
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Error deleting recipe: $e'),
-        backgroundColor: Colors.red,
-      ),
-    );
   }
-}
+
+  Future<void> _deleteOrArchiveRecipe(Recipe recipe) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(
+          recipe.isArchived ? 'Permanently Delete?' : 'Archive Recipe?',
+        ),
+        content: Text(
+          recipe.isArchived
+              ? 'This will permanently remove "${recipe.title}". Continue?'
+              : 'Archiving will hide "${recipe.title}" from everyone except admins. You can still restore it later. Proceed?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('CANCEL'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: Text(recipe.isArchived ? 'DELETE' : 'ARCHIVE'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+
+    try {
+      final admin = FirebaseAuth.instance.currentUser;
+      final adminId = admin?.uid ?? '';
+      final adminName = admin?.displayName ?? 'Admin';
+      final adminImage = admin?.photoURL ?? '';
+
+      if (recipe.isArchived) {
+        // permanent delete path
+        await FirebaseFirestore.instance
+            .collection('recipes')
+            .doc(recipe.id)
+            .delete();
+        if (recipe.authorId.isNotEmpty) {
+          await FirebaseFirestore.instance
+              .collection('notifications')
+              .doc(recipe.authorId)
+              .collection('items')
+              .add({
+                'type': 'deleted_permanent',
+                'fromUserId': adminId,
+                'fromUsername': adminName,
+                'fromUserImage': adminImage,
+                'recipeId': recipe.id,
+                'recipeTitle': recipe.title,
+                'recipeImage': recipe.coverImageUrl,
+                'message':
+                    'Your archived post "${recipe.title}" was permanently removed by an admin.',
+                'createdAt': FieldValue.serverTimestamp(),
+              });
+        }
+      } else {
+        // archive instead of delete
+        await FirebaseFirestore.instance
+            .collection('recipes')
+            .doc(recipe.id)
+            .update({'isArchived': true});
+        if (recipe.authorId.isNotEmpty) {
+          await FirebaseFirestore.instance
+              .collection('notifications')
+              .doc(recipe.authorId)
+              .collection('items')
+              .add({
+                'type': 'archived',
+                'fromUserId': adminId,
+                'fromUsername': adminName,
+                'fromUserImage': adminImage,
+                'recipeId': recipe.id,
+                'recipeTitle': recipe.title,
+                'recipeImage': recipe.coverImageUrl,
+                'message':
+                    'Your post "${recipe.title}" was archived by an admin.',
+                'createdAt': FieldValue.serverTimestamp(),
+              });
+        }
+      }
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              recipe.isArchived
+                  ? 'Recipe permanently deleted'
+                  : 'Recipe archived',
+            ),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint('Error deleting recipe: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error processing recipe: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      // 🔸 APP BAR - Orange gradient style
       appBar: AppBar(
         elevation: 6,
         backgroundColor: Colors.transparent,
@@ -180,16 +266,32 @@ class _AdminPageState extends State<AdminPage> {
         actions: [
           Row(
             children: [
+              // Archived view toggle
+              IconButton(
+                tooltip: _viewArchived ? 'Show Active' : 'Show Archived',
+                icon: Icon(
+                  _viewArchived
+                      ? Icons.inventory_2_outlined
+                      : Icons.archive_outlined,
+                  color: Colors.white,
+                ),
+                onPressed: () {
+                  setState(() {
+                    _viewArchived = !_viewArchived;
+                  });
+                },
+              ),
               Text(
-                _showHidden ? 'Hidden' : 'Active',
+                _viewArchived
+                    ? 'Archived'
+                    : (_showHidden ? 'Hidden' : 'Active'),
                 style: const TextStyle(color: Colors.white, fontSize: 14),
               ),
               Switch(
                 value: _showHidden,
                 onChanged: (value) {
-                  setState(() {
-                    _showHidden = value;
-                  });
+                  if (_viewArchived) return; // disabled while viewing archived
+                  setState(() => _showHidden = value);
                 },
                 activeColor: Colors.white,
                 inactiveThumbColor: Colors.orangeAccent,
@@ -210,8 +312,6 @@ class _AdminPageState extends State<AdminPage> {
           ),
         ],
       ),
-
-      // 🔸 BODY - modern cards with shadows
       body: StreamBuilder<QuerySnapshot>(
         stream: FirebaseFirestore.instance
             .collection('recipes')
@@ -242,7 +342,10 @@ class _AdminPageState extends State<AdminPage> {
                 return Recipe.fromJson(data);
               })
               .where(
-                (recipe) => _showHidden ? recipe.isHidden : !recipe.isHidden,
+                (recipe) => _viewArchived
+                    ? recipe.isArchived
+                    : (!recipe.isArchived &&
+                          (_showHidden ? recipe.isHidden : !recipe.isHidden)),
               )
               .toList();
 
@@ -252,8 +355,7 @@ class _AdminPageState extends State<AdminPage> {
             itemBuilder: (context, index) {
               final recipe = recipes[index];
               return Container(
-                margin:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                 decoration: BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(16),
@@ -266,8 +368,10 @@ class _AdminPageState extends State<AdminPage> {
                   ],
                 ),
                 child: ListTile(
-                  contentPadding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 10,
+                  ),
                   onTap: () {
                     Navigator.push(
                       context,
@@ -284,18 +388,19 @@ class _AdminPageState extends State<AdminPage> {
                             width: 55,
                             height: 55,
                             fit: BoxFit.cover,
-                            // Added error handling for image loading
                             errorBuilder: (context, error, stackTrace) =>
                                 Container(
-                              width: 55,
-                              height: 55,
-                              decoration: BoxDecoration(
-                                color: Colors.orange.shade100,
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: const Icon(Icons.broken_image,
-                                  color: Colors.grey),
-                            ),
+                                  width: 55,
+                                  height: 55,
+                                  decoration: BoxDecoration(
+                                    color: Colors.orange.shade100,
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: const Icon(
+                                    Icons.broken_image,
+                                    color: Colors.grey,
+                                  ),
+                                ),
                           ),
                         )
                       : Container(
@@ -313,19 +418,16 @@ class _AdminPageState extends State<AdminPage> {
                       fontWeight: FontWeight.bold,
                       fontSize: 16,
                       color: recipe.isHidden
-                          ? Colors.grey // Grey out hidden items
+                          ? Colors.grey
                           : const Color(0xFF333333),
                       decoration: recipe.isHidden
-                          ? TextDecoration.lineThrough // Strikethrough hidden items
+                          ? TextDecoration.lineThrough
                           : null,
                     ),
                   ),
                   subtitle: Text(
                     'By ${recipe.authorName} • ${recipe.category}',
-                    style: const TextStyle(
-                      fontSize: 13,
-                      color: Colors.black54,
-                    ),
+                    style: const TextStyle(fontSize: 13, color: Colors.black54),
                   ),
                   trailing: Row(
                     mainAxisSize: MainAxisSize.min,
@@ -340,10 +442,53 @@ class _AdminPageState extends State<AdminPage> {
                         onPressed: () => _toggleHideRecipe(recipe),
                         tooltip: recipe.isHidden ? 'Unhide' : 'Hide',
                       ),
-                      IconButton(
-                        icon: const Icon(Icons.delete_outline, color: Colors.red),
-                        onPressed: () => _deleteRecipe(recipe),
-                        tooltip: 'Delete',
+                      PopupMenuButton<String>(
+                        onSelected: (value) {
+                          switch (value) {
+                            case 'archive':
+                              _deleteOrArchiveRecipe(recipe);
+                              break;
+                            case 'delete':
+                              _deleteOrArchiveRecipe(recipe);
+                              break;
+                            case 'restore':
+                              _restoreRecipe(recipe);
+                              break;
+                            case 'unhide':
+                              _toggleHideRecipe(recipe);
+                              break;
+                            case 'hide':
+                              _toggleHideRecipe(recipe);
+                              break;
+                          }
+                        },
+                        itemBuilder: (context) {
+                          return <PopupMenuEntry<String>>[
+                            if (!recipe.isArchived)
+                              const PopupMenuItem(
+                                value: 'archive',
+                                child: Text('Archive'),
+                              ),
+                            if (recipe.isArchived) ...[
+                              const PopupMenuItem(
+                                value: 'restore',
+                                child: Text('Restore'),
+                              ),
+                              const PopupMenuItem(
+                                value: 'delete',
+                                child: Text('Delete Permanently'),
+                              ),
+                            ],
+                            if (!recipe.isArchived)
+                              PopupMenuItem(
+                                value: recipe.isHidden ? 'unhide' : 'hide',
+                                child: Text(
+                                  recipe.isHidden ? 'Unhide' : 'Hide',
+                                ),
+                              ),
+                          ];
+                        },
+                        icon: const Icon(Icons.more_vert, color: Colors.red),
                       ),
                     ],
                   ),

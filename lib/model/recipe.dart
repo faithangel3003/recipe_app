@@ -32,6 +32,7 @@ class Recipe {
   final List<String> likedBy;
   final DateTime createdAt;
   final bool isHidden;
+  final bool isArchived; // soft-deletion / archival status
 
   int get likes => likedBy.length;
 
@@ -50,6 +51,7 @@ class Recipe {
     required this.likedBy,
     required this.createdAt,
     this.isHidden = false,
+    this.isArchived = false,
   });
 
   Map<String, dynamic> toJson() => {
@@ -67,6 +69,7 @@ class Recipe {
     'likedBy': likedBy,
     'createdAt': createdAt.toIso8601String(),
     'isHidden': isHidden,
+    'isArchived': isArchived,
   };
 
   factory Recipe.fromJson(Map<String, dynamic> json) {
@@ -113,6 +116,7 @@ class Recipe {
       likedBy: List<String>.from(json['likedBy'] ?? []),
       createdAt: parseCreatedAt(json['createdAt']),
       isHidden: json['isHidden'] ?? false,
+      isArchived: json['isArchived'] ?? false,
     );
   }
 }

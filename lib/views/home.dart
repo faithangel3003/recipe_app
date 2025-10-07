@@ -20,7 +20,6 @@ class _HomePageState extends State<HomePage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-<<<<<<< HEAD
       appBar: AppBar(
         automaticallyImplyLeading: false,
         elevation: 0,
@@ -47,34 +46,6 @@ class _HomePageState extends State<HomePage> {
           ],
         ),
       ),
-=======
-       appBar: AppBar(
-  automaticallyImplyLeading: false,
-  elevation: 0,
-  flexibleSpace: Container(
-    decoration: const BoxDecoration(
-      gradient: LinearGradient(
-        colors: [Colors.orangeAccent, Colors.deepOrange],
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-      ),
-    ),
-  ),
-  title: Row(
-    children: [
-      Image.asset('assets/logo.png', height: 36),
-      const SizedBox(width: 10),
-      const Text(
-        "INGRDNTS",
-        style: TextStyle(
-          color: Colors.white,
-          fontWeight: FontWeight.bold,
-        ),
-      ),
-    ],
-  ),
-),
->>>>>>> d0f7ac37ecece3b8c586e7220e09cb5937492c0c
 
       body: Padding(
         padding: const EdgeInsets.all(16),
@@ -287,6 +258,8 @@ class _HomePageState extends State<HomePage> {
                 .where(
                   (recipe) =>
                       following.contains(recipe.authorId) &&
+                      // Exclude archived recipes unless viewing own
+                      (!recipe.isArchived || recipe.authorId == userId) &&
                       (selectedCategory == "All" ||
                           recipe.category == selectedCategory),
                 )
@@ -354,6 +327,8 @@ class _HomePageState extends State<HomePage> {
             .where(
               (recipe) =>
                   !recipe.isHidden &&
+                  // Exclude archived unless own recipe
+                  (!recipe.isArchived || recipe.authorId == userId) &&
                   (selectedCategory == "All" ||
                       recipe.category == selectedCategory),
             )
@@ -525,6 +500,13 @@ class _FoodGridItemState extends State<_FoodGridItem> {
         Expanded(
           child: GestureDetector(
             onTap: () {
+              // Prevent opening archived recipe if not author (extra safety)
+              if (item.isArchived && item.authorId != widget.userId) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('This recipe is archived.')),
+                );
+                return;
+              }
               Navigator.push(
                 context,
                 MaterialPageRoute(

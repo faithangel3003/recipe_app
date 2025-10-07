@@ -93,7 +93,14 @@ class _SearchPageState extends State<SearchPage> {
       final visibleMatches = matches.where((data) {
         final isHiddenRaw = data['isHidden'];
         final bool isHidden = isHiddenRaw == true || isHiddenRaw == 'true';
+        final isArchivedRaw = data['isArchived'];
+        final bool isArchived =
+            isArchivedRaw == true || isArchivedRaw == 'true';
         final authorId = (data['authorId'] ?? '').toString();
+        // Hide archived unless owner
+        if (isArchived && !(currentUid != null && authorId == currentUid)) {
+          return false;
+        }
         if (!isHidden) return true;
         // allow owners to see their own hidden recipes
         return currentUid != null && authorId == currentUid;
@@ -353,6 +360,12 @@ class _FoodGridItemState extends State<_FoodGridItem> {
         Expanded(
           child: GestureDetector(
             onTap: () {
+              if (item.isArchived && item.authorId != widget.userId) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('This recipe is archived.')),
+                );
+                return;
+              }
               Navigator.push(
                 context,
                 MaterialPageRoute(

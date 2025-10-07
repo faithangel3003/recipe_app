@@ -159,14 +159,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
         automaticallyImplyLeading: true,
         title: const Text(
           "Edit Profile",
-<<<<<<< HEAD
           style: TextStyle(color: Colors.orange, fontWeight: FontWeight.bold),
-=======
-          style: TextStyle(
-            color: Colors.orange,
-            fontWeight: FontWeight.bold,
-          ),
->>>>>>> d0f7ac37ecece3b8c586e7220e09cb5937492c0c
         ),
         centerTitle: true,
         backgroundColor: Colors.white,
@@ -196,7 +189,6 @@ class _EditProfilePageState extends State<EditProfilePage> {
                           CircleAvatar(
                             radius: 55,
                             backgroundColor: Colors.orange.withOpacity(0.2),
-<<<<<<< HEAD
                             backgroundImage: profileImageProvider,
                             child: profileImageProvider == null
                                 ? const Icon(
@@ -204,17 +196,6 @@ class _EditProfilePageState extends State<EditProfilePage> {
                                     size: 60,
                                     color: Colors.orange,
                                   )
-=======
-                            backgroundImage: _imageFile != null
-                                ? FileImage(_imageFile!)
-                                : (widget.user.profileImageUrl.isNotEmpty
-                                    ? NetworkImage(widget.user.profileImageUrl)
-                                    : null) as ImageProvider<Object>?,
-                            child: (_imageFile == null &&
-                                    widget.user.profileImageUrl.isEmpty)
-                                ? const Icon(Icons.person,
-                                    size: 60, color: Colors.orange)
->>>>>>> d0f7ac37ecece3b8c586e7220e09cb5937492c0c
                                 : null,
                           ),
                           Container(
@@ -223,16 +204,11 @@ class _EditProfilePageState extends State<EditProfilePage> {
                               color: Colors.orange,
                               shape: BoxShape.circle,
                             ),
-<<<<<<< HEAD
                             child: const Icon(
                               Icons.camera_alt,
                               size: 20,
                               color: Colors.white,
                             ),
-=======
-                            child: const Icon(Icons.camera_alt,
-                                size: 20, color: Colors.white),
->>>>>>> d0f7ac37ecece3b8c586e7220e09cb5937492c0c
                           ),
                         ],
                       ),
@@ -244,14 +220,9 @@ class _EditProfilePageState extends State<EditProfilePage> {
                     TextFormField(
                       controller: _usernameController,
                       decoration: _inputDecoration("Username"),
-<<<<<<< HEAD
                       validator: (value) => value == null || value.isEmpty
                           ? "Enter a username"
                           : null,
-=======
-                      validator: (value) =>
-                          value == null || value.isEmpty ? "Enter a username" : null,
->>>>>>> d0f7ac37ecece3b8c586e7220e09cb5937492c0c
                     ),
                     const SizedBox(height: 20),
 
@@ -260,8 +231,9 @@ class _EditProfilePageState extends State<EditProfilePage> {
                       controller: _emailController,
                       decoration: _inputDecoration("Email"),
                       keyboardType: TextInputType.emailAddress,
-                      validator: (value) =>
-                          value == null || value.isEmpty ? "Enter an email" : null,
+                      validator: (value) => value == null || value.isEmpty
+                          ? "Enter an email"
+                          : null,
                     ),
                     const SizedBox(height: 20),
 

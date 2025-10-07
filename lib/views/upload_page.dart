@@ -293,7 +293,7 @@ class _UploadPageState extends State<UploadPage> {
                           Icon(Icons.image, size: 40),
                           Text("Add Cover Photo"),
                           Text(
-                            "(up to 12 Mb)",
+                            "(up to 4 Mb)",
                             style: TextStyle(fontSize: 12, color: Colors.grey),
                           ),
                         ],
