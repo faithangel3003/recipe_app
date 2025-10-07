@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 class FollowService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
+  bool _isProcessing = false; // Prevent multiple clicks from lagging
 
   Future<bool> toggleFollow(
     String currentUid,
@@ -9,10 +10,11 @@ class FollowService {
     String username,
     String profileImageUrl,
   ) async {
-    try {
-      print('Toggling follow: $currentUid -> $targetUid');
+    // Prevent double-click lag
+    if (_isProcessing) return false;
+    _isProcessing = true;
 
-      // Check if user is trying to follow themselves
+    try {
       if (currentUid == targetUid) {
         throw Exception('You cannot follow yourself');
       }
@@ -20,80 +22,76 @@ class FollowService {
       final currentUserRef = _db.collection("users").doc(currentUid);
       final targetUserRef = _db.collection("users").doc(targetUid);
 
-      // Check if both users exist
-      final currentUserSnap = await currentUserRef.get();
-      final targetUserSnap = await targetUserRef.get();
+      // Fetch both users concurrently (faster)
+      final snapshots = await Future.wait([
+        currentUserRef.get(),
+        targetUserRef.get(),
+      ]);
 
-      if (!currentUserSnap.exists) {
-        throw Exception('Current user not found');
-      }
-      if (!targetUserSnap.exists) {
-        throw Exception('User to follow not found');
+      final currentUserSnap = snapshots[0];
+      final targetUserSnap = snapshots[1];
+
+      if (!currentUserSnap.exists || !targetUserSnap.exists) {
+        throw Exception('User not found');
       }
 
-      // Check current follow status
-      final currentUserData = currentUserSnap.data() ?? <String, dynamic>{};
+      final currentUserData = currentUserSnap.data() ?? {};
       final following = List<String>.from(currentUserData["following"] ?? []);
       final isFollowing = following.contains(targetUid);
 
+      final batch = _db.batch(); // Use batch for atomic update
+
       if (isFollowing) {
-        // Unfollow
-        print('Unfollowing user: $targetUid');
-        await currentUserRef.update({
+        // --- UNFOLLOW ---
+        batch.update(currentUserRef, {
           "following": FieldValue.arrayRemove([targetUid]),
         });
-        await targetUserRef.update({
+        batch.update(targetUserRef, {
           "followers": FieldValue.arrayRemove([currentUid]),
         });
-        print('Unfollow successful');
-        return false;
       } else {
-        // Follow
-        print('Following user: $targetUid');
-        await currentUserRef.update({
+        // --- FOLLOW ---
+        batch.update(currentUserRef, {
           "following": FieldValue.arrayUnion([targetUid]),
         });
-        await targetUserRef.update({
+        batch.update(targetUserRef, {
           "followers": FieldValue.arrayUnion([currentUid]),
         });
 
-        // Add notification
-        print('Creating notification');
-        await _db
+        // Notification (separate write to avoid blocking batch)
+        _db
             .collection("notifications")
             .doc(targetUid)
             .collection("items")
             .add({
-              "type": "follow",
-              "fromUserId": currentUid,
-              "fromUsername": username,
-              "fromUserImage": profileImageUrl,
-              "createdAt": FieldValue.serverTimestamp(),
-              "read": false,
-            });
-
-        print('Follow successful');
-        return true;
+          "type": "follow",
+          "fromUserId": currentUid,
+          "fromUsername": username,
+          "fromUserImage": profileImageUrl,
+          "createdAt": FieldValue.serverTimestamp(),
+          "read": false,
+        }).catchError((e) {
+          print("Notification error: $e");
+        });
       }
+
+      await batch.commit();
+      return !isFollowing;
     } on FirebaseException catch (e) {
       print('Firestore error: ${e.code} - ${e.message}');
-      if (e.code == 'permission-denied') {
-        throw Exception(
-          'Permission denied. Please check Firestore security rules.',
-        );
-      } else {
-        throw Exception('Firestore error: ${e.message}');
-      }
+      throw Exception('Firestore error: ${e.message}');
     } catch (e) {
       print('Follow error: $e');
       rethrow;
+    } finally {
+      _isProcessing = false;
     }
   }
 
   Stream<bool> isFollowing(String currentUid, String targetUid) {
     return _db.collection("users").doc(currentUid).snapshots().map((snapshot) {
       if (!snapshot.exists) return false;
-      final data = snapshot.data() ?? <String, dynamic>{};
+      final data = snapshot.data() ?? {};
       final following = List<String>.from(data["following"] ?? []);
       return following.contains(targetUid);
     });

@@ -9,7 +9,7 @@ import 'recipe_detail_page.dart';
 class OtherUserProfilePage extends StatefulWidget {
   final String userId;
   const OtherUserProfilePage({Key? key, required this.userId})
-    : super(key: key);
+      : super(key: key);
 
   @override
   _OtherUserProfilePageState createState() => _OtherUserProfilePageState();
@@ -22,18 +22,16 @@ class _OtherUserProfilePageState extends State<OtherUserProfilePage> {
   Future<void> _toggleFollow() async {
     if (_currentUser == null || _isProcessingFollow) return;
     setState(() => _isProcessingFollow = true);
-    final currentUid = _currentUser.uid;
+    final currentUid = _currentUser!.uid;
 
     try {
-      final currentUserSnap = await FirebaseFirestore.instance
-          .collection('users')
-          .doc(currentUid)
-          .get();
+      final currentUserSnap =
+          await FirebaseFirestore.instance.collection('users').doc(currentUid).get();
       final currentUserData = currentUserSnap.data() ?? {};
-      final username =
-          currentUserData['username'] ?? currentUserData['name'] ?? 'Someone';
-      final profileImageUrl =
-          currentUserData['photoUrl'] ??
+      final username = currentUserData['username'] ??
+          currentUserData['name'] ??
+          'Someone';
+      final profileImageUrl = currentUserData['photoUrl'] ??
           currentUserData['profileImageUrl'] ??
           '';
 
@@ -53,9 +51,8 @@ class _OtherUserProfilePageState extends State<OtherUserProfilePage> {
         ),
       );
     } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Error: $e')));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('Error: $e')));
     } finally {
       if (mounted) setState(() => _isProcessingFollow = false);
     }
@@ -113,23 +110,24 @@ class _OtherUserProfilePageState extends State<OtherUserProfilePage> {
           return SingleChildScrollView(
             child: Column(
               children: [
-                // 🔶 Gradient Header with Profile Info
+                // 🌆 Background with blur (replacing orange gradient)
                 Stack(
                   children: [
                     Container(
                       height: 290,
                       decoration: const BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [Color(0xFFFFA726), Color(0xFFFF7043)],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
+                        image: DecorationImage(
+                          image: AssetImage('assets/backgroundpic.jpg'),
+                          fit: BoxFit.cover,
                         ),
                       ),
                     ),
                     Positioned.fill(
                       child: BackdropFilter(
-                        filter: ImageFilter.blur(sigmaX: 6, sigmaY: 6),
-                        child: Container(color: Colors.black.withOpacity(0.2)),
+                        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                        child: Container(
+                          color: Colors.black.withOpacity(0.4),
+                        ),
                       ),
                     ),
                     Positioned.fill(
@@ -144,8 +142,7 @@ class _OtherUserProfilePageState extends State<OtherUserProfilePage> {
                               backgroundImage: photoUrl.isNotEmpty
                                   ? NetworkImage(photoUrl)
                                   : const NetworkImage(
-                                      "https://via.placeholder.com/150",
-                                    ),
+                                      "https://via.placeholder.com/150"),
                             ),
                           ),
                           const SizedBox(height: 10),
@@ -195,8 +192,6 @@ class _OtherUserProfilePageState extends State<OtherUserProfilePage> {
                             ),
                           ),
                           const SizedBox(height: 15),
-
-                          // 📊 Stats Row
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                             children: [
@@ -239,62 +234,40 @@ class _OtherUserProfilePageState extends State<OtherUserProfilePage> {
                   ],
                 ),
 
-                // ✨ Transition to recipe section
-                Container(
-                  height: 25,
-                  decoration: const BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.only(
-                      topLeft: Radius.circular(25),
-                      topRight: Radius.circular(25),
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black26,
-                        offset: Offset(0, -2),
-                        blurRadius: 8,
-                      ),
-                    ],
-                  ),
-                ),
+               Container(
+  width: double.infinity,
+  decoration: const BoxDecoration(
+    color: Colors.white,
+    borderRadius: BorderRadius.only(
+      topLeft: Radius.circular(25),
+      topRight: Radius.circular(25),
+    ),
+    boxShadow: [
+      BoxShadow(
+        color: Colors.black26,
+        offset: Offset(0, -3),
+        blurRadius: 10,
+      ),
+    ],
+  ),
+  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+  child: Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      const Text(
+        "Recipes",
+        style: TextStyle(
+          fontSize: 18,
+          fontWeight: FontWeight.bold,
+          color: Colors.black87,
+        ),
+      ),
+      const SizedBox(height: 10),
+      _buildRecipeGrid(),
+    ],
+  ),
+),
 
-                // 📂 User Recipes Grid
-                Container(
-                  width: double.infinity,
-                  decoration: const BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.only(
-                      topLeft: Radius.circular(25),
-                      topRight: Radius.circular(25),
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black12,
-                        offset: Offset(0, -1),
-                        blurRadius: 6,
-                      ),
-                    ],
-                  ),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 16,
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        "Recipes",
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.black87,
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      _buildRecipeGrid(),
-                    ],
-                  ),
-                ),
               ],
             ),
           );
@@ -316,7 +289,7 @@ class _OtherUserProfilePageState extends State<OtherUserProfilePage> {
             final data = doc.data();
             final archived =
                 data['isArchived'] == true || data['isArchived'] == 'true';
-            return !archived; // exclude archived from public count
+            return !archived;
           }).length;
         }
         return Column(
@@ -357,9 +330,14 @@ class _OtherUserProfilePageState extends State<OtherUserProfilePage> {
 
         final docs = snapshot.data!.docs.where((doc) {
           final data = doc.data();
-          final archived =
-              data['isArchived'] == true || data['isArchived'] == 'true';
-          return !archived; // hide archived from other users
+          final isArchived = data['isArchived'] == true || data['isArchived'] == 'true';
+          final isHidden = data['isHidden'] == true || data['isHidden'] == 'true';
+          final authorId = data['authorId'];
+          final isOwner = _currentUser?.uid == authorId;
+
+          // ✅ Only show hidden/archived if the current user is the owner
+          if ((isArchived || isHidden) && !isOwner) return false;
+          return true;
         }).toList();
 
         return GridView.builder(
