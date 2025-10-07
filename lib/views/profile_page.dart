@@ -50,57 +50,56 @@ class _ProfilePageState extends State<ProfilePage> {
 
     return Scaffold(
       appBar: AppBar(
-  elevation: 4,
-  backgroundColor: Colors.transparent,
-  flexibleSpace: Container(
-    decoration: const BoxDecoration(
-      gradient: LinearGradient(
-        colors: [Color(0xFFFFA726), Color(0xFFFF7043)], // soft orange gradient
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-      ),
-    ),
-  ),
-  title: const Text(
-    "My Profile",
-    style: TextStyle(
-      fontSize: 22,
-      fontWeight: FontWeight.w700,
-      color: Colors.white,
-      letterSpacing: 1,
-    ),
-  ),
-  centerTitle: true,
-  iconTheme: const IconThemeData(color: Colors.white),
-  actions: [
-    IconButton(
-      icon: const Icon(Icons.edit, color: Colors.white),
-      onPressed: _openEditProfile,
-    ),
-    PopupMenuButton<String>(
-      color: Colors.white,
-      icon: const Icon(Icons.more_vert, color: Colors.white),
-      onSelected: (value) async {
-        if (value == 'logout') {
-          await FirebaseAuth.instance.signOut();
-          if (mounted) {
-            Navigator.of(context).pushReplacementNamed("/login");
-          }
-        }
-      },
-      itemBuilder: (context) => [
-        const PopupMenuItem(
-          value: 'logout',
-          child: Text(
-            "Log Out",
-            style: TextStyle(color: Colors.black87),
+        elevation: 4,
+        backgroundColor: Colors.transparent,
+        flexibleSpace: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                Color(0xFFFFA726),
+                Color(0xFFFF7043),
+              ], // soft orange gradient
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
           ),
         ),
-      ],
-    ),
-  ],
-),
-
+        title: const Text(
+          "My Profile",
+          style: TextStyle(
+            fontSize: 22,
+            fontWeight: FontWeight.w700,
+            color: Colors.white,
+            letterSpacing: 1,
+          ),
+        ),
+        centerTitle: true,
+        iconTheme: const IconThemeData(color: Colors.white),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.edit, color: Colors.white),
+            onPressed: _openEditProfile,
+          ),
+          PopupMenuButton<String>(
+            color: Colors.white,
+            icon: const Icon(Icons.more_vert, color: Colors.white),
+            onSelected: (value) async {
+              if (value == 'logout') {
+                await FirebaseAuth.instance.signOut();
+                if (mounted) {
+                  Navigator.of(context).pushReplacementNamed("/login");
+                }
+              }
+            },
+            itemBuilder: (context) => [
+              const PopupMenuItem(
+                value: 'logout',
+                child: Text("Log Out", style: TextStyle(color: Colors.black87)),
+              ),
+            ],
+          ),
+        ],
+      ),
       body: SingleChildScrollView(
         child: Column(
           children: [
@@ -139,7 +138,8 @@ class _ProfilePageState extends State<ProfilePage> {
                               backgroundImage: user?.photoURL != null
                                   ? NetworkImage(user!.photoURL!)
                                   : const NetworkImage(
-                                      "https://via.placeholder.com/150"),
+                                      "https://via.placeholder.com/150",
+                                    ),
                             ),
                           ),
                           Positioned(
@@ -152,11 +152,16 @@ class _ProfilePageState extends State<ProfilePage> {
                                   color: Colors.orange,
                                   shape: BoxShape.circle,
                                   border: Border.all(
-                                      color: Colors.white, width: 2),
+                                    color: Colors.white,
+                                    width: 2,
+                                  ),
                                 ),
                                 padding: const EdgeInsets.all(6),
-                                child: const Icon(Icons.add,
-                                    color: Colors.white, size: 22),
+                                child: const Icon(
+                                  Icons.add,
+                                  color: Colors.white,
+                                  size: 22,
+                                ),
                               ),
                             ),
                           ),
@@ -169,9 +174,10 @@ class _ProfilePageState extends State<ProfilePage> {
                       Text(
                         user?.displayName ?? "Unknown User",
                         style: const TextStyle(
-                            fontSize: 20,
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold),
+                          fontSize: 20,
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
 
                       const SizedBox(height: 15),
@@ -188,18 +194,28 @@ class _ProfilePageState extends State<ProfilePage> {
                           }
                           final data = snapshot.data!.data() ?? {};
                           final followers =
-                              (data['followers'] as List<dynamic>? ?? []).length;
+                              (data['followers'] as List<dynamic>? ?? [])
+                                  .length;
                           final following =
-                              (data['following'] as List<dynamic>? ?? []).length;
+                              (data['following'] as List<dynamic>? ?? [])
+                                  .length;
                           return StreamBuilder<QuerySnapshot>(
                             stream: FirebaseFirestore.instance
                                 .collection('recipes')
                                 .where('authorId', isEqualTo: user?.uid)
                                 .snapshots(),
                             builder: (context, snap) {
-                              final recipes = snap.hasData
-                                  ? snap.data!.docs.length
-                                  : 0;
+                              int recipes = 0;
+                              if (snap.hasData) {
+                                recipes = snap.data!.docs.where((doc) {
+                                  final data =
+                                      doc.data() as Map<String, dynamic>;
+                                  final archived =
+                                      data['isArchived'] == true ||
+                                      data['isArchived'] == 'true';
+                                  return !archived; // exclude archived from public count
+                                }).length;
+                              }
                               return _buildStats(recipes, following, followers);
                             },
                           );
@@ -245,9 +261,7 @@ class _ProfilePageState extends State<ProfilePage> {
                     ],
                   ),
                   const SizedBox(height: 10),
-                  _selectedIndex == 0
-                      ? _buildFoodGrid()
-                      : _buildLikedGrid(),
+                  _selectedIndex == 0 ? _buildFoodGrid() : _buildLikedGrid(),
                 ],
               ),
             ),
@@ -257,7 +271,7 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 
-   Widget _buildStats(int recipes, int following, int followers) {
+  Widget _buildStats(int recipes, int following, int followers) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 16),
       child: Row(
@@ -296,28 +310,29 @@ class _ProfilePageState extends State<ProfilePage> {
       ),
     );
   }
+
   Widget _statItem(String label, int count) {
-  return Column(
-    children: [
-      Text(
-        count.toString(),
-        style: const TextStyle(
-          fontWeight: FontWeight.bold,
-          fontSize: 16,
-          color: Colors.white, // ✅ Make the numbers white
+    return Column(
+      children: [
+        Text(
+          count.toString(),
+          style: const TextStyle(
+            fontWeight: FontWeight.bold,
+            fontSize: 16,
+            color: Colors.white, // ✅ Make the numbers white
+          ),
         ),
-      ),
-      const SizedBox(height: 4),
-      Text(
-        label,
-        style: const TextStyle(
-          color: Colors.grey, // label stays grey for contrast
-          fontSize: 14,
+        const SizedBox(height: 4),
+        Text(
+          label,
+          style: const TextStyle(
+            color: Colors.grey, // label stays grey for contrast
+            fontSize: 14,
+          ),
         ),
-      ),
-    ],
-  );
-}
+      ],
+    );
+  }
 
   Widget _tabButton(String text, int index) {
     final isSelected = _selectedIndex == index;
@@ -348,8 +363,10 @@ class _ProfilePageState extends State<ProfilePage> {
   Future<void> _pickImage() async {
     final ImagePicker picker = ImagePicker();
     final user = FirebaseAuth.instance.currentUser;
-    final XFile? image =
-        await picker.pickImage(source: ImageSource.gallery, imageQuality: 80);
+    final XFile? image = await picker.pickImage(
+      source: ImageSource.gallery,
+      imageQuality: 80,
+    );
     if (image == null || user == null) return;
 
     showDialog(
@@ -359,19 +376,19 @@ class _ProfilePageState extends State<ProfilePage> {
     );
     try {
       final cloudinary = CloudinaryService();
-      final uploadedUrl =
-          await cloudinary.uploadFile(File(image.path), folder: 'profile_images');
+      final uploadedUrl = await cloudinary.uploadFile(
+        File(image.path),
+        folder: 'profile_images',
+      );
       await user.updatePhotoURL(uploadedUrl);
-      await FirebaseFirestore.instance
-          .collection('users')
-          .doc(user.uid)
-          .update({'profileImageUrl': uploadedUrl});
+      await FirebaseFirestore.instance.collection('users').doc(user.uid).update(
+        {'profileImageUrl': uploadedUrl},
+      );
     } finally {
       if (mounted) Navigator.pop(context);
       setState(() {});
     }
   }
-
 
   // Recipes Tab
   Widget _buildFoodGrid() {
@@ -385,7 +402,8 @@ class _ProfilePageState extends State<ProfilePage> {
         if (!snapshot.hasData) {
           return const Center(child: CircularProgressIndicator());
         }
-        final docs = snapshot.data!.docs;
+        final docs =
+            snapshot.data!.docs; // show all (including archived) to owner
         if (docs.isEmpty) {
           return const Center(child: Text("No recipes yet"));
         }
@@ -426,7 +444,15 @@ class _ProfilePageState extends State<ProfilePage> {
         if (!snapshot.hasData) {
           return const Center(child: CircularProgressIndicator());
         }
-        final docs = snapshot.data!.docs;
+        final docs = snapshot.data!.docs.where((doc) {
+          final data = doc.data() as Map<String, dynamic>;
+          final archived =
+              data['isArchived'] == true || data['isArchived'] == 'true';
+          final authorId = data['authorId']?.toString() ?? '';
+          // hide archived liked recipes unless current user is the author
+          if (archived && authorId != user.uid) return false;
+          return true;
+        }).toList();
         if (docs.isEmpty) {
           return const Center(child: Text("No liked recipes yet"));
         }
@@ -480,8 +506,9 @@ class _ProfileRecipeCardState extends State<_ProfileRecipeCard> {
   @override
   void initState() {
     super.initState();
-    _isLiked = widget.recipe.likedBy
-        .contains(FirebaseAuth.instance.currentUser!.uid);
+    _isLiked = widget.recipe.likedBy.contains(
+      FirebaseAuth.instance.currentUser!.uid,
+    );
     _likesCount = widget.recipe.likes;
   }
 
@@ -541,8 +568,7 @@ class _ProfileRecipeCardState extends State<_ProfileRecipeCard> {
                 .get(),
             builder: (context, snapshot) {
               if (!snapshot.hasData) return const SizedBox(height: 30);
-              final userData =
-                  snapshot.data!.data() as Map<String, dynamic>?;
+              final userData = snapshot.data!.data() as Map<String, dynamic>?;
               if (userData == null) return const SizedBox(height: 30);
 
               return Padding(
@@ -551,11 +577,13 @@ class _ProfileRecipeCardState extends State<_ProfileRecipeCard> {
                   children: [
                     CircleAvatar(
                       radius: 14,
-                      backgroundImage: (userData['profileImageUrl'] != null &&
+                      backgroundImage:
+                          (userData['profileImageUrl'] != null &&
                               userData['profileImageUrl'].isNotEmpty)
                           ? NetworkImage(userData['profileImageUrl'])
                           : null,
-                      child: (userData['profileImageUrl'] == null ||
+                      child:
+                          (userData['profileImageUrl'] == null ||
                               userData['profileImageUrl'].isEmpty)
                           ? const Icon(Icons.person, size: 16)
                           : null,
@@ -621,7 +649,9 @@ class _ProfileRecipeCardState extends State<_ProfileRecipeCard> {
                             ? const SizedBox(
                                 width: 12,
                                 height: 12,
-                                child: CircularProgressIndicator(strokeWidth: 2),
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
                               )
                             : Icon(
                                 _isLiked
@@ -644,8 +674,11 @@ class _ProfileRecipeCardState extends State<_ProfileRecipeCard> {
                         shape: BoxShape.circle,
                       ),
                       child: PopupMenuButton<String>(
-                        icon: const Icon(Icons.more_vert,
-                            color: Colors.white, size: 20),
+                        icon: const Icon(
+                          Icons.more_vert,
+                          color: Colors.white,
+                          size: 20,
+                        ),
                         onSelected: (value) async {
                           if (value == 'edit') {
                             Navigator.push(
@@ -665,10 +698,8 @@ class _ProfileRecipeCardState extends State<_ProfileRecipeCard> {
                           }
                         },
                         itemBuilder: (context) => const [
-                          PopupMenuItem(
-                              value: 'edit', child: Text('Edit')),
-                          PopupMenuItem(
-                              value: 'delete', child: Text('Delete')),
+                          PopupMenuItem(value: 'edit', child: Text('Edit')),
+                          PopupMenuItem(value: 'delete', child: Text('Delete')),
                         ],
                       ),
                     ),
@@ -677,7 +708,7 @@ class _ProfileRecipeCardState extends State<_ProfileRecipeCard> {
             ),
           ),
         ),
-       
+
         const SizedBox(height: 6),
         // Title + Meta + Likes
         Text(
@@ -703,5 +734,3 @@ class _ProfileRecipeCardState extends State<_ProfileRecipeCard> {
     );
   }
 }
-
-

@@ -93,8 +93,11 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               // App icon or logo area
-              Icon(Icons.lock_reset_rounded,
-                  color: Colors.deepOrange, size: screen.width * 0.2),
+              Icon(
+                Icons.lock_reset_rounded,
+                color: Colors.deepOrange,
+                size: screen.width * 0.2,
+              ),
               const SizedBox(height: 20),
 
               const Text(
@@ -116,8 +119,10 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
 
               // Card-like container
               Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 20, vertical: 25),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 25,
+                ),
                 decoration: BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(20),

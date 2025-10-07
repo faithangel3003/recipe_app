@@ -29,23 +29,23 @@ class NotificationPage extends StatelessWidget {
 
     return Scaffold(
       appBar: AppBar(
-  backgroundColor: Colors.white,
-  elevation: 1,
-  iconTheme: const IconThemeData(color: Colors.orange),
-  title: Row(
-    children: [
-      Image.asset('assets/logo.png', height: 35), // your logo
-      const SizedBox(width: 10),
-      const Text(
-        "Notifications",
-        style: TextStyle(
-          color: Colors.orange,
-          fontWeight: FontWeight.bold,
+        backgroundColor: Colors.white,
+        elevation: 1,
+        iconTheme: const IconThemeData(color: Colors.orange),
+        title: Row(
+          children: [
+            Image.asset('assets/logo.png', height: 35), // your logo
+            const SizedBox(width: 10),
+            const Text(
+              "Notifications",
+              style: TextStyle(
+                color: Colors.orange,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
         ),
       ),
-    ],
-  ),
-),
       body: StreamBuilder<QuerySnapshot>(
         stream: FirebaseFirestore.instance
             .collection("notifications")
@@ -97,20 +97,45 @@ class NotificationPage extends StatelessWidget {
                     final fromUser = data["fromUsername"] ?? "Someone";
                     final fromImage = data["fromUserImage"] ?? "";
                     final fromUid = data["fromUserId"] ?? "";
-                    final createdAt = (data["createdAt"] as Timestamp?)
-                        ?.toDate();
+                    // createdAt intentionally omitted here; we use timestamps only for grouping above.
                     final recipeImage = data["recipeImage"] ?? "";
                     final recipeTitle = data["recipeTitle"] ?? "";
 
                     String message = "";
-                    if (type == "like") {
-                      message = "$fromUser liked your recipe: $recipeTitle";
-                    } else if (type == "follow") {
-                      message = "$fromUser started following you";
-                    } else if (type == 'hidden') {
-                      message =
-                          data['message'] ??
-                          'Your post was hidden by an admin.';
+                    switch (type) {
+                      case 'like':
+                        message = "$fromUser liked your recipe: $recipeTitle";
+                        break;
+                      case 'follow':
+                        message = "$fromUser started following you";
+                        break;
+                      case 'hidden':
+                        message =
+                            data['message'] ??
+                            'Your post was hidden by an admin.';
+                        break;
+                      case 'unhidden':
+                        message =
+                            data['message'] ?? 'Your post is visible again.';
+                        break;
+                      case 'archived':
+                        message =
+                            data['message'] ??
+                            'Your post was archived by an admin.';
+                        break;
+                      case 'unarchived':
+                        message =
+                            data['message'] ??
+                            'Your post was restored by an admin.';
+                        break;
+                      case 'deleted_permanent':
+                        message =
+                            data['message'] ??
+                            'An archived post was permanently removed.';
+                        break;
+                      default:
+                        message =
+                            data['message'] ?? 'You have a new notification.';
                     }
 
                     return ListTile(
@@ -128,7 +153,11 @@ class NotificationPage extends StatelessWidget {
                       ),
                       subtitle: Text(message),
                       trailing:
-                          (type == "like" || type == 'hidden') &&
+                          (type == 'like' ||
+                                  type == 'hidden' ||
+                                  type == 'unhidden' ||
+                                  type == 'archived' ||
+                                  type == 'unarchived') &&
                               recipeImage.isNotEmpty
                           ? ClipRRect(
                               borderRadius: BorderRadius.circular(8),
@@ -139,16 +168,20 @@ class NotificationPage extends StatelessWidget {
                                 fit: BoxFit.cover,
                               ),
                             )
-                          : type == "follow"
+                          : type == 'follow'
                           ? FollowButton(
                               fromUid: fromUid,
                               fromUsername: fromUser,
                               fromUserImage: fromImage,
                             )
                           : null,
-                      onTap: (type == "like" || type == 'hidden')
+                      onTap:
+                          (type == 'like' ||
+                              type == 'hidden' ||
+                              type == 'unhidden' ||
+                              type == 'unarchived')
                           ? () async {
-                              final recipeId = data["recipeId"] ?? "";
+                              final recipeId = data['recipeId'] ?? '';
                               if (recipeId.isEmpty) return;
                               final doc = await FirebaseFirestore.instance
                                   .collection('recipes')
@@ -163,7 +196,17 @@ class NotificationPage extends StatelessWidget {
                                 );
                                 return;
                               }
-                              final recipe = Recipe.fromJson(doc.data()!);
+                              final recipeData = doc.data()!;
+                              // If archived, inform instead of navigating (or choose to still navigate if you want view-only)
+                              if ((recipeData['isArchived'] ?? false) == true) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('This recipe is archived.'),
+                                  ),
+                                );
+                                return;
+                              }
+                              final recipe = Recipe.fromJson(recipeData);
                               Navigator.push(
                                 context,
                                 MaterialPageRoute(

@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import '../model/user.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -121,16 +122,44 @@ class _EditProfilePageState extends State<EditProfilePage> {
 
   @override
   Widget build(BuildContext context) {
+    // Determine the correct ImageProvider: prefer the freshly picked File, else
+    // use NetworkImage for remote URLs and FileImage for local file paths (only on non-web).
+    ImageProvider<Object>? profileImageProvider;
+    if (_imageFile != null) {
+      profileImageProvider = FileImage(_imageFile!);
+    } else if (widget.user.profileImageUrl.isNotEmpty) {
+      final url = widget.user.profileImageUrl;
+      final isNetwork =
+          url.startsWith('http') ||
+          url.startsWith('https') ||
+          url.startsWith('data:');
+      final isLocalPath = RegExp(
+        r'^[A-Za-z]:\\|^[A-Za-z]:/|^/|^file://',
+      ).hasMatch(url);
+
+      if (isNetwork) {
+        profileImageProvider = NetworkImage(url);
+      } else if (!kIsWeb && isLocalPath) {
+        // For Windows paths like C:\Users\... or POSIX /... use FileImage.
+        final cleaned = url.replaceFirst('file://', '');
+        try {
+          profileImageProvider = FileImage(File(cleaned));
+        } catch (e) {
+          profileImageProvider = null;
+        }
+      } else {
+        // As a last resort, try network (it may still fail and show placeholder)
+        profileImageProvider = NetworkImage(url);
+      }
+    }
+
     return Scaffold(
       backgroundColor: Colors.grey[50],
       appBar: AppBar(
         automaticallyImplyLeading: true,
         title: const Text(
           "Edit Profile",
-          style: TextStyle(
-            color: Colors.orange,
-            fontWeight: FontWeight.bold,
-          ),
+          style: TextStyle(color: Colors.orange, fontWeight: FontWeight.bold),
         ),
         centerTitle: true,
         backgroundColor: Colors.white,
@@ -160,15 +189,13 @@ class _EditProfilePageState extends State<EditProfilePage> {
                           CircleAvatar(
                             radius: 55,
                             backgroundColor: Colors.orange.withOpacity(0.2),
-                            backgroundImage: _imageFile != null
-                                ? FileImage(_imageFile!)
-                                : (widget.user.profileImageUrl.isNotEmpty
-                                    ? NetworkImage(widget.user.profileImageUrl)
-                                    : null) as ImageProvider<Object>?,
-                            child: (_imageFile == null &&
-                                    widget.user.profileImageUrl.isEmpty)
-                                ? const Icon(Icons.person,
-                                    size: 60, color: Colors.orange)
+                            backgroundImage: profileImageProvider,
+                            child: profileImageProvider == null
+                                ? const Icon(
+                                    Icons.person,
+                                    size: 60,
+                                    color: Colors.orange,
+                                  )
                                 : null,
                           ),
                           Container(
@@ -177,8 +204,11 @@ class _EditProfilePageState extends State<EditProfilePage> {
                               color: Colors.orange,
                               shape: BoxShape.circle,
                             ),
-                            child: const Icon(Icons.camera_alt,
-                                size: 20, color: Colors.white),
+                            child: const Icon(
+                              Icons.camera_alt,
+                              size: 20,
+                              color: Colors.white,
+                            ),
                           ),
                         ],
                       ),
@@ -190,8 +220,9 @@ class _EditProfilePageState extends State<EditProfilePage> {
                     TextFormField(
                       controller: _usernameController,
                       decoration: _inputDecoration("Username"),
-                      validator: (value) =>
-                          value == null || value.isEmpty ? "Enter a username" : null,
+                      validator: (value) => value == null || value.isEmpty
+                          ? "Enter a username"
+                          : null,
                     ),
                     const SizedBox(height: 20),
 
@@ -200,8 +231,9 @@ class _EditProfilePageState extends State<EditProfilePage> {
                       controller: _emailController,
                       decoration: _inputDecoration("Email"),
                       keyboardType: TextInputType.emailAddress,
-                      validator: (value) =>
-                          value == null || value.isEmpty ? "Enter an email" : null,
+                      validator: (value) => value == null || value.isEmpty
+                          ? "Enter an email"
+                          : null,
                     ),
                     const SizedBox(height: 20),
 
