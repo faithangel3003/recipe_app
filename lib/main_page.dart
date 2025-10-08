@@ -8,7 +8,7 @@ import 'package:flutter/material.dart';
 import 'views/profile_page.dart';
 
 class MainPage extends StatefulWidget {
-  const MainPage({super.key});
+const MainPage({super.key});
 
   @override
   State<MainPage> createState() => _MainPageState();

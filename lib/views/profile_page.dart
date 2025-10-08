@@ -552,185 +552,216 @@ class _ProfileRecipeCardState extends State<_ProfileRecipeCard> {
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final recipe = widget.recipe;
+ @override
+Widget build(BuildContext context) {
+  final recipe = widget.recipe;
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // Author Row ONLY for Liked tab
-        if (!widget.isOwner)
-          FutureBuilder<DocumentSnapshot>(
-            future: FirebaseFirestore.instance
-                .collection('users')
-                .doc(recipe.authorId)
-                .get(),
-            builder: (context, snapshot) {
-              if (!snapshot.hasData) return const SizedBox(height: 30);
-              final userData = snapshot.data!.data() as Map<String, dynamic>?;
-              if (userData == null) return const SizedBox(height: 30);
+  // Check for archived or hidden posts
+  final isArchived = recipe.isArchived == true || recipe.isArchived == 'true';
+  final isHidden = recipe.isHidden == true || recipe.isHidden == 'true';
 
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 6),
-                child: Row(
-                  children: [
-                    CircleAvatar(
-                      radius: 14,
-                      backgroundImage:
-                          (userData['profileImageUrl'] != null &&
-                              userData['profileImageUrl'].isNotEmpty)
-                          ? NetworkImage(userData['profileImageUrl'])
-                          : null,
-                      child:
-                          (userData['profileImageUrl'] == null ||
-                              userData['profileImageUrl'].isEmpty)
-                          ? const Icon(Icons.person, size: 16)
-                          : null,
-                    ),
-                    const SizedBox(width: 6),
-                    Expanded(
-                      child: Text(
-                        userData['username'] ?? "Unknown",
-                        style: const TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w500,
-                        ),
-                        overflow: TextOverflow.ellipsis,
+  // Disable all interactivity if archived or hidden
+  final isDisabled = isArchived || isHidden;
+
+  return Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      // Author Row ONLY for Liked tab
+      if (!widget.isOwner)
+        FutureBuilder<DocumentSnapshot>(
+          future: FirebaseFirestore.instance
+              .collection('users')
+              .doc(recipe.authorId)
+              .get(),
+          builder: (context, snapshot) {
+            if (!snapshot.hasData) return const SizedBox(height: 30);
+            final userData = snapshot.data!.data() as Map<String, dynamic>?;
+            if (userData == null) return const SizedBox(height: 30);
+
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 6),
+              child: Row(
+                children: [
+                  CircleAvatar(
+                    radius: 14,
+                    backgroundImage:
+                        (userData['profileImageUrl'] != null &&
+                                userData['profileImageUrl'].isNotEmpty)
+                            ? NetworkImage(userData['profileImageUrl'])
+                            : null,
+                    child: (userData['profileImageUrl'] == null ||
+                            userData['profileImageUrl'].isEmpty)
+                        ? const Icon(Icons.person, size: 16)
+                        : null,
+                  ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      userData['username'] ?? "Unknown",
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
                       ),
+                      overflow: TextOverflow.ellipsis,
                     ),
-                  ],
-                ),
-              );
-            },
-          ),
+                  ),
+                ],
+              ),
+            );
+          },
+        ),
 
-        // Recipe Card
-        Expanded(
-          child: GestureDetector(
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => RecipeDetailPage(recipe: recipe),
-                ),
-              );
-            },
-            child: Stack(
-              children: [
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(16),
-                  child: recipe.coverImageUrl.isNotEmpty
-                      ? Image.network(
-                          recipe.coverImageUrl,
-                          width: double.infinity,
-                          height: double.infinity,
-                          fit: BoxFit.cover,
-                        )
-                      : Container(
-                          decoration: BoxDecoration(
-                            color: Colors.grey.shade300,
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                          child: const Center(child: Icon(Icons.image)),
+      // Recipe Card
+      Expanded(
+        child: GestureDetector(
+          onTap: isDisabled
+              ? null // disable tap if archived or hidden
+              : () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => RecipeDetailPage(recipe: recipe),
+                    ),
+                  );
+                },
+          child: Stack(
+            children: [
+              // Recipe Image
+              ClipRRect(
+                borderRadius: BorderRadius.circular(16),
+                child: recipe.coverImageUrl.isNotEmpty
+                    ? Image.network(
+                        recipe.coverImageUrl,
+                        width: double.infinity,
+                        height: double.infinity,
+                        fit: BoxFit.cover,
+                      )
+                    : Container(
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade300,
+                          borderRadius: BorderRadius.circular(16),
                         ),
-                ),
-                // Heart icon ONLY for Liked tab
-                if (!widget.isOwner)
-                  Positioned(
-                    right: 8,
-                    top: 8,
-                    child: GestureDetector(
-                      onTap: _handleLike,
-                      child: CircleAvatar(
-                        backgroundColor: Colors.white.withOpacity(0.9),
-                        radius: 16,
-                        child: _isLoading
-                            ? const SizedBox(
-                                width: 12,
-                                height: 12,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                ),
-                              )
-                            : Icon(
-                                _isLiked
-                                    ? Icons.favorite
-                                    : Icons.favorite_border,
-                                color: _isLiked ? Colors.red : Colors.grey,
-                                size: 18,
-                              ),
+                        child: const Center(child: Icon(Icons.image)),
+                      ),
+              ),
+
+              // 🔒 or 🙈 Overlay for archived or hidden recipes
+              if (isDisabled)
+                Positioned.fill(
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 300),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withOpacity(0.5),
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Center(
+                      child: Icon(
+                        isArchived
+                            ? Icons.lock
+                            : Icons.visibility_off, // 🙈 for hidden
+                        color: Colors.white,
+                        size: 40,
                       ),
                     ),
                   ),
-                // 3-dot menu ONLY for Recipes tab
-                if (widget.isOwner)
-                  Positioned(
-                    right: 8,
-                    top: 8,
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: Colors.black.withOpacity(0.5),
-                        shape: BoxShape.circle,
-                      ),
-                      child: PopupMenuButton<String>(
-                        icon: const Icon(
-                          Icons.more_vert,
-                          color: Colors.white,
-                          size: 20,
-                        ),
-                        onSelected: (value) async {
-                          if (value == 'edit') {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => EditRecipePage(
-                                  recipeId: widget.recipeId,
-                                  recipeData: recipe.toJson(),
-                                ),
-                              ),
-                            );
-                          } else if (value == 'delete') {
-                            await FirebaseFirestore.instance
-                                .collection('recipes')
-                                .doc(widget.recipeId)
-                                .delete();
-                          }
-                        },
-                        itemBuilder: (context) => const [
-                          PopupMenuItem(value: 'edit', child: Text('Edit')),
-                          PopupMenuItem(value: 'delete', child: Text('Delete')),
-                        ],
-                      ),
+                ),
+
+              // ❤️ Heart icon ONLY for Liked tab (not disabled)
+              if (!widget.isOwner && !isDisabled)
+                Positioned(
+                  right: 8,
+                  top: 8,
+                  child: GestureDetector(
+                    onTap: _handleLike,
+                    child: CircleAvatar(
+                      backgroundColor: Colors.white.withOpacity(0.9),
+                      radius: 16,
+                      child: _isLoading
+                          ? const SizedBox(
+                              width: 12,
+                              height: 12,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : Icon(
+                              _isLiked
+                                  ? Icons.favorite
+                                  : Icons.favorite_border,
+                              color: _isLiked ? Colors.red : Colors.grey,
+                              size: 18,
+                            ),
                     ),
                   ),
-              ],
-            ),
+                ),
+
+              // ⋮ Menu (Edit/Delete) ONLY for Recipes tab (not disabled)
+              if (widget.isOwner && !isDisabled)
+                Positioned(
+                  right: 8,
+                  top: 8,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: Colors.black.withOpacity(0.5),
+                      shape: BoxShape.circle,
+                    ),
+                    child: PopupMenuButton<String>(
+                      icon: const Icon(
+                        Icons.more_vert,
+                        color: Colors.white,
+                        size: 20,
+                      ),
+                      onSelected: (value) async {
+                        if (value == 'edit') {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => EditRecipePage(
+                                recipeId: widget.recipeId,
+                                recipeData: recipe.toJson(),
+                              ),
+                            ),
+                          );
+                        } else if (value == 'delete') {
+                          await FirebaseFirestore.instance
+                              .collection('recipes')
+                              .doc(widget.recipeId)
+                              .delete();
+                        }
+                      },
+                      itemBuilder: (context) => const [
+                        PopupMenuItem(value: 'edit', child: Text('Edit')),
+                        PopupMenuItem(value: 'delete', child: Text('Delete')),
+                      ],
+                    ),
+                  ),
+                ),
+            ],
           ),
         ),
+      ),
 
-        const SizedBox(height: 6),
-        // Title + Meta + Likes
-        Text(
-          recipe.title,
-          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-        ),
-        const SizedBox(height: 4),
-        Text(
-          '${recipe.category} • ${recipe.cookingDuration} mins',
-          style: const TextStyle(color: Colors.grey, fontSize: 12),
-        ),
-        const SizedBox(height: 4),
-        Row(
-          children: [
-            Icon(Icons.favorite, color: Colors.red.shade400, size: 14),
-            const SizedBox(width: 4),
-            Text('$_likesCount likes', style: const TextStyle(fontSize: 12)),
-          ],
-        ),
-      ],
-    );
-  }
+      const SizedBox(height: 6),
+
+      // Title + Meta + Likes
+      Text(
+        recipe.title,
+        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+      ),
+      const SizedBox(height: 4),
+      Text(
+        '${recipe.category} • ${recipe.cookingDuration} mins',
+        style: const TextStyle(color: Colors.grey, fontSize: 12),
+      ),
+      const SizedBox(height: 4),
+      Row(
+        children: [
+          Icon(Icons.favorite, color: Colors.red.shade400, size: 14),
+          const SizedBox(width: 4),
+          Text('$_likesCount likes', style: const TextStyle(fontSize: 12)),
+        ],
+      ),
+    ],
+  );
+}
 }
