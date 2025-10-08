@@ -128,7 +128,7 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
         ),
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 25, vertical: 40),
-          // Make the content scrollable so the keyboard or extra messages don't cause overflow
+
           child: GestureDetector(
             onTap: () => FocusScope.of(context).unfocus(),
             child: SingleChildScrollView(

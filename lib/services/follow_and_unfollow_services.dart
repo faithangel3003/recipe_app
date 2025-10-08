@@ -62,17 +62,18 @@ class FollowService {
         _db
             .collection("notifications")
             .doc(targetUid)
-            .collection("items")
+            .collection('items')
             .add({
-          "type": "follow",
-          "fromUserId": currentUid,
-          "fromUsername": username,
-          "fromUserImage": profileImageUrl,
-          "createdAt": FieldValue.serverTimestamp(),
-          "read": false,
-        }).catchError((e) {
-          print("Notification error: $e");
-        });
+              "type": "follow",
+              "fromUserId": currentUid,
+              "fromUsername": username,
+              "fromUserImage": profileImageUrl,
+              "createdAt": FieldValue.serverTimestamp(),
+              "read": false,
+            })
+            .catchError((e) {
+              print("Notification error: $e");
+            });
       }
 
       await batch.commit();
@@ -81,7 +82,6 @@ class FollowService {
       print('Firestore error: ${e.code} - ${e.message}');
       throw Exception('Firestore error: ${e.message}');
     } catch (e) {
-      print('Follow error: $e');
       rethrow;
     } finally {
       _isProcessing = false;
