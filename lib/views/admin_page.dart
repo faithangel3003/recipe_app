@@ -16,6 +16,132 @@ class _AdminPageState extends State<AdminPage> {
   bool _showHidden = false;
   bool _viewArchived =
       false; // when true show archived recipes instead of active/hidden
+  bool _viewAppeals = false; // when true show appeals list instead of recipes
+
+  Future<void> _approveAppeal(DocumentSnapshot appealDoc) async {
+    final data = appealDoc.data() as Map<String, dynamic>;
+    final recipeId = data['recipeId']?.toString() ?? '';
+    final authorId = data['authorId']?.toString() ?? '';
+    if (recipeId.isEmpty || authorId.isEmpty) return;
+
+    final recipeRef = FirebaseFirestore.instance
+        .collection('recipes')
+        .doc(recipeId);
+    final appealRef = appealDoc.reference;
+    final admin = FirebaseAuth.instance.currentUser;
+    final adminId = admin?.uid ?? '';
+    final adminName = admin?.displayName ?? 'Admin';
+    final adminImage = admin?.photoURL ?? '';
+
+    try {
+      await FirebaseFirestore.instance.runTransaction((txn) async {
+        final recipeSnap = await txn.get(recipeRef);
+        if (!recipeSnap.exists) {
+          txn.update(appealRef, {
+            'status': 'invalid',
+            'resolvedAt': FieldValue.serverTimestamp(),
+            'note': 'Recipe no longer exists',
+          });
+          return;
+        }
+        txn.update(recipeRef, {'isHidden': false});
+        txn.update(appealRef, {
+          'status': 'approved',
+          'resolvedAt': FieldValue.serverTimestamp(),
+        });
+      });
+
+      // Send notification (appeal approved + unhidden effect)
+      await FirebaseFirestore.instance
+          .collection('notifications')
+          .doc(authorId)
+          .collection('items')
+          .add({
+            'type': 'appeal_approved',
+            'fromUserId': adminId,
+            'fromUsername': adminName,
+            'fromUserImage': adminImage,
+            'recipeId': recipeId,
+            'recipeTitle': data['title'] ?? '',
+            'recipeImage': data['coverImageUrl'] ?? '',
+            'message':
+                'Your appeal for "${data['title'] ?? ''}" was approved. The recipe is now visible again.',
+            'createdAt': FieldValue.serverTimestamp(),
+          });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Appeal approved & recipe unhidden'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error approving appeal: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _rejectAppeal(DocumentSnapshot appealDoc) async {
+    final data = appealDoc.data() as Map<String, dynamic>;
+    final recipeId = data['recipeId']?.toString() ?? '';
+    final authorId = data['authorId']?.toString() ?? '';
+    final admin = FirebaseAuth.instance.currentUser;
+    final adminId = admin?.uid ?? '';
+    final adminName = admin?.displayName ?? 'Admin';
+    final adminImage = admin?.photoURL ?? '';
+
+    try {
+      await appealDoc.reference.update({
+        'status': 'rejected',
+        'resolvedAt': FieldValue.serverTimestamp(),
+      });
+
+      if (authorId.isNotEmpty) {
+        await FirebaseFirestore.instance
+            .collection('notifications')
+            .doc(authorId)
+            .collection('items')
+            .add({
+              'type': 'appeal_rejected',
+              'fromUserId': adminId,
+              'fromUsername': adminName,
+              'fromUserImage': adminImage,
+              'recipeId': recipeId,
+              'recipeTitle': data['title'] ?? '',
+              'recipeImage': data['coverImageUrl'] ?? '',
+              'message':
+                  'Your appeal for "${data['title'] ?? ''}" was rejected. The recipe remains hidden.',
+              'createdAt': FieldValue.serverTimestamp(),
+            });
+      }
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Appeal rejected'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error rejecting appeal: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
 
   Future<void> _toggleHideRecipe(Recipe recipe) async {
     try {
@@ -266,6 +392,19 @@ class _AdminPageState extends State<AdminPage> {
         actions: [
           Row(
             children: [
+              // Appeals view toggle
+              IconButton(
+                tooltip: _viewAppeals ? 'View Recipes' : 'View Appeals',
+                icon: Icon(
+                  _viewAppeals ? Icons.receipt_long : Icons.flag_outlined,
+                  color: Colors.white,
+                ),
+                onPressed: () {
+                  setState(() {
+                    _viewAppeals = !_viewAppeals;
+                  });
+                },
+              ),
               // Archived view toggle
               IconButton(
                 tooltip: _viewArchived ? 'Show Active' : 'Show Archived',
@@ -313,28 +452,180 @@ class _AdminPageState extends State<AdminPage> {
         ],
       ),
       body: StreamBuilder<QuerySnapshot>(
-        stream: FirebaseFirestore.instance
-            .collection('recipes')
-            .orderBy('createdAt', descending: true)
-            .snapshots(),
+        stream: _viewAppeals
+            ? FirebaseFirestore.instance
+                  .collection('recipeAppeals')
+                  .orderBy('createdAt', descending: true)
+                  .snapshots()
+            : FirebaseFirestore.instance
+                  .collection('recipes')
+                  .orderBy('createdAt', descending: true)
+                  .snapshots(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
           }
-
           if (snapshot.hasError) {
             return Center(child: Text('Error: ${snapshot.error}'));
           }
-
           if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-            return const Center(
+            return Center(
               child: Text(
-                'No recipes found',
-                style: TextStyle(fontSize: 16, color: Colors.grey),
+                _viewAppeals ? 'No appeals found' : 'No recipes found',
+                style: const TextStyle(fontSize: 16, color: Colors.grey),
               ),
             );
           }
 
+          if (_viewAppeals) {
+            final appeals = snapshot.data!.docs;
+            return ListView.builder(
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              itemCount: appeals.length,
+              itemBuilder: (context, index) {
+                final doc = appeals[index];
+                final data = doc.data() as Map<String, dynamic>;
+                final status = data['status']?.toString() ?? 'pending';
+                Color badgeColor;
+                switch (status) {
+                  case 'approved':
+                    badgeColor = Colors.green;
+                    break;
+                  case 'rejected':
+                    badgeColor = Colors.redAccent;
+                    break;
+                  case 'invalid':
+                    badgeColor = Colors.grey;
+                    break;
+                  default:
+                    badgeColor = Colors.orange; // pending
+                }
+
+                return Container(
+                  margin: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 8,
+                  ),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.orange.withOpacity(0.15),
+                        blurRadius: 6,
+                        offset: const Offset(0, 3),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              data['title'] ?? '(Untitled)',
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: badgeColor.withOpacity(0.15),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Text(
+                              status.toUpperCase(),
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                                color: badgeColor,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        'Reason: ${data['reason'] ?? '—'}',
+                        style: const TextStyle(
+                          fontSize: 13,
+                          color: Colors.black87,
+                        ),
+                      ),
+                      if (data['note'] != null)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 4),
+                          child: Text(
+                            'Note: ${data['note']}',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey,
+                            ),
+                          ),
+                        ),
+                      const SizedBox(height: 10),
+                      Row(
+                        children: [
+                          if (status == 'pending') ...[
+                            ElevatedButton.icon(
+                              onPressed: () => _approveAppeal(doc),
+                              icon: const Icon(Icons.check, size: 16),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.green,
+                                foregroundColor: Colors.white,
+                              ),
+                              label: const Text('Approve'),
+                            ),
+                            const SizedBox(width: 12),
+                            ElevatedButton.icon(
+                              onPressed: () => _rejectAppeal(doc),
+                              icon: const Icon(Icons.close, size: 16),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.redAccent,
+                                foregroundColor: Colors.white,
+                              ),
+                              label: const Text('Reject'),
+                            ),
+                          ] else ...[
+                            const Icon(
+                              Icons.info_outline,
+                              size: 16,
+                              color: Colors.grey,
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              status == 'approved'
+                                  ? 'Already processed (approved)'
+                                  : status == 'rejected'
+                                  ? 'Already processed (rejected)'
+                                  : 'Resolved',
+                              style: const TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey,
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ],
+                  ),
+                );
+              },
+            );
+          }
+
+          // Regular recipe moderation list
           final recipes = snapshot.data!.docs
               .map((doc) {
                 final data = doc.data() as Map<String, dynamic>;

@@ -134,6 +134,14 @@ class NotificationPage extends StatelessWidget {
                             data['message'] ??
                             'An archived post was permanently removed.';
                         break;
+                      case 'appeal_approved':
+                        message =
+                            data['message'] ?? 'Your appeal was approved.';
+                        break;
+                      case 'appeal_rejected':
+                        message =
+                            data['message'] ?? 'Your appeal was rejected.';
+                        break;
                       default:
                         message =
                             data['message'] ?? 'You have a new notification.';

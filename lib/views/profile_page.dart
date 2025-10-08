@@ -502,6 +502,101 @@ class _ProfileRecipeCardState extends State<_ProfileRecipeCard> {
   late bool _isLiked;
   late int _likesCount;
   bool _isLoading = false;
+  bool _appealSubmitting = false;
+
+  Future<void> _submitAppeal(Recipe recipe) async {
+    if (_appealSubmitting) return;
+    setState(() => _appealSubmitting = true);
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return;
+    final docRef = FirebaseFirestore.instance
+        .collection('recipeAppeals')
+        .doc(widget.recipeId); // one appeal per recipe
+    try {
+      final existing = await docRef.get();
+      if (existing.exists) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Appeal already submitted.')),
+          );
+        }
+        return;
+      }
+
+      String reason = '';
+      reason =
+          await showDialog<String>(
+            context: context,
+            builder: (ctx) {
+              final controller = TextEditingController();
+              return AlertDialog(
+                title: const Text('Appeal Hidden Recipe'),
+                content: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Text(
+                      'Provide a short reason why this recipe should be reviewed.',
+                      style: TextStyle(fontSize: 13),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: controller,
+                      maxLines: 4,
+                      decoration: const InputDecoration(
+                        hintText: 'Enter your appeal reason...',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                  ],
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(ctx, ''),
+                    child: const Text('CANCEL'),
+                  ),
+                  ElevatedButton(
+                    onPressed: () => Navigator.pop(ctx, controller.text),
+                    child: const Text('SUBMIT'),
+                  ),
+                ],
+              );
+            },
+          ) ??
+          '';
+
+      if (reason.trim().isEmpty) {
+        if (mounted) {
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(const SnackBar(content: Text('Appeal cancelled.')));
+        }
+        return;
+      }
+
+      await docRef.set({
+        'recipeId': widget.recipeId,
+        'authorId': uid,
+        'title': recipe.title,
+        'createdAt': FieldValue.serverTimestamp(),
+        'status': 'pending',
+        'reason': reason.trim(),
+        'isHidden': recipe.isHidden,
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Appeal submitted.')));
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Failed to submit appeal: $e')));
+      }
+    } finally {
+      if (mounted) setState(() => _appealSubmitting = false);
+    }
+  }
 
   @override
   void initState() {
@@ -552,216 +647,280 @@ class _ProfileRecipeCardState extends State<_ProfileRecipeCard> {
     }
   }
 
- @override
-Widget build(BuildContext context) {
-  final recipe = widget.recipe;
+  @override
+  Widget build(BuildContext context) {
+    final recipe = widget.recipe;
 
-  // Check for archived or hidden posts
-  final isArchived = recipe.isArchived == true || recipe.isArchived == 'true';
-  final isHidden = recipe.isHidden == true || recipe.isHidden == 'true';
+    // Archived posts are fully disabled; hidden posts remain actionable
+    final bool isArchived = recipe.isArchived == true;
+    final bool isHidden = recipe.isHidden == true;
+    final bool isDisabled = isArchived; // only archived fully disabled
 
-  // Disable all interactivity if archived or hidden
-  final isDisabled = isArchived || isHidden;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Author Row ONLY for Liked tab
+        if (!widget.isOwner)
+          FutureBuilder<DocumentSnapshot>(
+            future: FirebaseFirestore.instance
+                .collection('users')
+                .doc(recipe.authorId)
+                .get(),
+            builder: (context, snapshot) {
+              if (!snapshot.hasData) return const SizedBox(height: 30);
+              final userData = snapshot.data!.data() as Map<String, dynamic>?;
+              if (userData == null) return const SizedBox(height: 30);
 
-  return Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      // Author Row ONLY for Liked tab
-      if (!widget.isOwner)
-        FutureBuilder<DocumentSnapshot>(
-          future: FirebaseFirestore.instance
-              .collection('users')
-              .doc(recipe.authorId)
-              .get(),
-          builder: (context, snapshot) {
-            if (!snapshot.hasData) return const SizedBox(height: 30);
-            final userData = snapshot.data!.data() as Map<String, dynamic>?;
-            if (userData == null) return const SizedBox(height: 30);
-
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 6),
-              child: Row(
-                children: [
-                  CircleAvatar(
-                    radius: 14,
-                    backgroundImage:
-                        (userData['profileImageUrl'] != null &&
-                                userData['profileImageUrl'].isNotEmpty)
-                            ? NetworkImage(userData['profileImageUrl'])
-                            : null,
-                    child: (userData['profileImageUrl'] == null ||
-                            userData['profileImageUrl'].isEmpty)
-                        ? const Icon(Icons.person, size: 16)
-                        : null,
-                  ),
-                  const SizedBox(width: 6),
-                  Expanded(
-                    child: Text(
-                      userData['username'] ?? "Unknown",
-                      style: const TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w500,
-                      ),
-                      overflow: TextOverflow.ellipsis,
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 6),
+                child: Row(
+                  children: [
+                    CircleAvatar(
+                      radius: 14,
+                      backgroundImage:
+                          (userData['profileImageUrl'] != null &&
+                              userData['profileImageUrl'].isNotEmpty)
+                          ? NetworkImage(userData['profileImageUrl'])
+                          : null,
+                      child:
+                          (userData['profileImageUrl'] == null ||
+                              userData['profileImageUrl'].isEmpty)
+                          ? const Icon(Icons.person, size: 16)
+                          : null,
                     ),
-                  ),
-                ],
-              ),
-            );
-          },
-        ),
-
-      // Recipe Card
-      Expanded(
-        child: GestureDetector(
-          onTap: isDisabled
-              ? null // disable tap if archived or hidden
-              : () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => RecipeDetailPage(recipe: recipe),
-                    ),
-                  );
-                },
-          child: Stack(
-            children: [
-              // Recipe Image
-              ClipRRect(
-                borderRadius: BorderRadius.circular(16),
-                child: recipe.coverImageUrl.isNotEmpty
-                    ? Image.network(
-                        recipe.coverImageUrl,
-                        width: double.infinity,
-                        height: double.infinity,
-                        fit: BoxFit.cover,
-                      )
-                    : Container(
-                        decoration: BoxDecoration(
-                          color: Colors.grey.shade300,
-                          borderRadius: BorderRadius.circular(16),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        userData['username'] ?? "Unknown",
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
                         ),
-                        child: const Center(child: Icon(Icons.image)),
+                        overflow: TextOverflow.ellipsis,
                       ),
-              ),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
 
-              // 🔒 or 🙈 Overlay for archived or hidden recipes
-              if (isDisabled)
-                Positioned.fill(
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 300),
-                    decoration: BoxDecoration(
-                      color: Colors.black.withOpacity(0.5),
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: Center(
-                      child: Icon(
-                        isArchived
-                            ? Icons.lock
-                            : Icons.visibility_off, // 🙈 for hidden
-                        color: Colors.white,
-                        size: 40,
+        // Recipe Card
+        Expanded(
+          child: GestureDetector(
+            onTap: isDisabled
+                ? null // disable tap if archived or hidden
+                : () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => RecipeDetailPage(recipe: recipe),
                       ),
-                    ),
-                  ),
+                    );
+                  },
+            child: Stack(
+              children: [
+                // Recipe Image
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(16),
+                  child: recipe.coverImageUrl.isNotEmpty
+                      ? Image.network(
+                          recipe.coverImageUrl,
+                          width: double.infinity,
+                          height: double.infinity,
+                          fit: BoxFit.cover,
+                        )
+                      : Container(
+                          decoration: BoxDecoration(
+                            color: Colors.grey.shade300,
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          child: const Center(child: Icon(Icons.image)),
+                        ),
                 ),
 
-              // ❤️ Heart icon ONLY for Liked tab (not disabled)
-              if (!widget.isOwner && !isDisabled)
-                Positioned(
-                  right: 8,
-                  top: 8,
-                  child: GestureDetector(
-                    onTap: _handleLike,
-                    child: CircleAvatar(
-                      backgroundColor: Colors.white.withOpacity(0.9),
-                      radius: 16,
-                      child: _isLoading
-                          ? const SizedBox(
-                              width: 12,
-                              height: 12,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : Icon(
-                              _isLiked
-                                  ? Icons.favorite
-                                  : Icons.favorite_border,
-                              color: _isLiked ? Colors.red : Colors.grey,
-                              size: 18,
+                // 🔒 or 🙈 Overlay for archived or hidden recipes
+                if (isArchived || isHidden)
+                  Positioned.fill(
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: Colors.black.withOpacity(0.35),
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: Align(
+                        alignment: Alignment.topLeft,
+                        child: Padding(
+                          padding: const EdgeInsets.all(8.0),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 4,
                             ),
+                            decoration: BoxDecoration(
+                              color: isArchived
+                                  ? Colors.red.withOpacity(0.8)
+                                  : Colors.orange.withOpacity(0.8),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  isArchived
+                                      ? Icons.lock
+                                      : Icons.visibility_off,
+                                  color: Colors.white,
+                                  size: 14,
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  isArchived ? 'Archived' : 'Hidden',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
                     ),
                   ),
-                ),
 
-              // ⋮ Menu (Edit/Delete) ONLY for Recipes tab (not disabled)
-              if (widget.isOwner && !isDisabled)
-                Positioned(
-                  right: 8,
-                  top: 8,
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: Colors.black.withOpacity(0.5),
-                      shape: BoxShape.circle,
-                    ),
-                    child: PopupMenuButton<String>(
-                      icon: const Icon(
-                        Icons.more_vert,
-                        color: Colors.white,
-                        size: 20,
-                      ),
-                      onSelected: (value) async {
-                        if (value == 'edit') {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => EditRecipePage(
-                                recipeId: widget.recipeId,
-                                recipeData: recipe.toJson(),
+                // ❤️ Heart icon ONLY for Liked tab (not disabled)
+                if (!widget.isOwner && !isDisabled)
+                  Positioned(
+                    right: 8,
+                    top: 8,
+                    child: GestureDetector(
+                      onTap: _handleLike,
+                      child: CircleAvatar(
+                        backgroundColor: Colors.white.withOpacity(0.9),
+                        radius: 16,
+                        child: _isLoading
+                            ? const SizedBox(
+                                width: 12,
+                                height: 12,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : Icon(
+                                _isLiked
+                                    ? Icons.favorite
+                                    : Icons.favorite_border,
+                                color: _isLiked ? Colors.red : Colors.grey,
+                                size: 18,
                               ),
-                            ),
-                          );
-                        } else if (value == 'delete') {
-                          await FirebaseFirestore.instance
-                              .collection('recipes')
-                              .doc(widget.recipeId)
-                              .delete();
-                        }
-                      },
-                      itemBuilder: (context) => const [
-                        PopupMenuItem(value: 'edit', child: Text('Edit')),
-                        PopupMenuItem(value: 'delete', child: Text('Delete')),
-                      ],
+                      ),
                     ),
                   ),
-                ),
-            ],
+
+                // ⋮ Menu (Edit/Delete) ONLY for Recipes tab (not disabled)
+                if (widget.isOwner && !isDisabled)
+                  Positioned(
+                    right: 8,
+                    top: 8,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: Colors.black.withOpacity(0.5),
+                        shape: BoxShape.circle,
+                      ),
+                      child: PopupMenuButton<String>(
+                        icon: const Icon(
+                          Icons.more_vert,
+                          color: Colors.white,
+                          size: 20,
+                        ),
+                        onSelected: (value) async {
+                          if (value == 'edit') {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => EditRecipePage(
+                                  recipeId: widget.recipeId,
+                                  recipeData: recipe.toJson(),
+                                ),
+                              ),
+                            );
+                          } else if (value == 'delete') {
+                            await FirebaseFirestore.instance
+                                .collection('recipes')
+                                .doc(widget.recipeId)
+                                .delete();
+                          } else if (value == 'appeal') {
+                            await _submitAppeal(recipe);
+                          }
+                        },
+                        itemBuilder: (context) {
+                          return [
+                            const PopupMenuItem(
+                              value: 'edit',
+                              child: Text('Edit'),
+                            ),
+                            const PopupMenuItem(
+                              value: 'delete',
+                              child: Text('Delete'),
+                            ),
+                            if (isHidden)
+                              PopupMenuItem(
+                                value: 'appeal',
+                                enabled: !_appealSubmitting,
+                                child: Row(
+                                  children: [
+                                    if (_appealSubmitting)
+                                      const SizedBox(
+                                        width: 14,
+                                        height: 14,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                        ),
+                                      ),
+                                    if (_appealSubmitting)
+                                      const SizedBox(width: 8),
+                                    Text(
+                                      _appealSubmitting
+                                          ? 'Submitting...'
+                                          : 'Appeal',
+                                    ),
+                                  ],
+                                ),
+                              ),
+                          ];
+                        },
+                      ),
+                    ),
+                  ),
+              ],
+            ),
           ),
         ),
-      ),
 
-      const SizedBox(height: 6),
+        const SizedBox(height: 6),
 
-      // Title + Meta + Likes
-      Text(
-        recipe.title,
-        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-      ),
-      const SizedBox(height: 4),
-      Text(
-        '${recipe.category} • ${recipe.cookingDuration} mins',
-        style: const TextStyle(color: Colors.grey, fontSize: 12),
-      ),
-      const SizedBox(height: 4),
-      Row(
-        children: [
-          Icon(Icons.favorite, color: Colors.red.shade400, size: 14),
-          const SizedBox(width: 4),
-          Text('$_likesCount likes', style: const TextStyle(fontSize: 12)),
-        ],
-      ),
-    ],
-  );
-}
+        // Title + Meta + Likes
+        Text(
+          recipe.title,
+          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+        const SizedBox(height: 4),
+        Text(
+          '${recipe.category} • ${recipe.cookingDuration} mins',
+          style: const TextStyle(color: Colors.grey, fontSize: 12),
+        ),
+        const SizedBox(height: 4),
+        Row(
+          children: [
+            Icon(Icons.favorite, color: Colors.red.shade400, size: 14),
+            const SizedBox(width: 4),
+            Text('$_likesCount likes', style: const TextStyle(fontSize: 12)),
+          ],
+        ),
+      ],
+    );
+  }
 }
