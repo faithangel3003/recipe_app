@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:final_proj/services/follow_and_unfollow_services.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -245,40 +246,135 @@ class FollowButton extends StatefulWidget {
 }
 
 class _FollowButtonState extends State<FollowButton> {
-  bool isFollowing = false;
-  final currentUid = FirebaseAuth.instance.currentUser!.uid;
+  bool _isFollowing = false;
+  bool _loading = false;
+  final String _currentUid = FirebaseAuth.instance.currentUser!.uid;
   final FollowService _followService = FollowService();
+  StreamSubscription? _sub;
 
   @override
   void initState() {
     super.initState();
-    _followService.isFollowing(currentUid, widget.fromUid).listen((value) {
-      setState(() {
-        isFollowing = value;
-      });
+    // Listen to follow state; ignore updates while a toggle is in flight.
+    _sub = _followService.isFollowing(_currentUid, widget.fromUid).listen((
+      value,
+    ) {
+      if (!_loading && mounted && _isFollowing != value) {
+        setState(() => _isFollowing = value);
+      }
     });
   }
 
+  @override
+  void dispose() {
+    _sub?.cancel();
+    super.dispose();
+  }
+
   Future<void> _toggleFollow() async {
-    await _followService.toggleFollow(
-      currentUid,
-      widget.fromUid,
-      widget.fromUsername,
-      widget.fromUserImage,
-    );
+    if (_loading) return; // debounce rapid taps
+    final bool original = _isFollowing;
+    setState(() {
+      _loading = true;
+      // Optimistic flip for snappy UI
+      _isFollowing = !original;
+    });
+    try {
+      final bool result = await _followService
+          .toggleFollow(
+            _currentUid,
+            widget.fromUid,
+            widget.fromUsername,
+            widget.fromUserImage,
+          )
+          .timeout(const Duration(seconds: 8));
+      if (mounted) {
+        setState(() {
+          _isFollowing = result; // authoritative state
+          _loading = false;
+        });
+      }
+    } on TimeoutException {
+      if (mounted) {
+        setState(() {
+          _isFollowing = original; // revert
+          _loading = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Network timeout, please try again')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isFollowing = original; // revert on error
+          _loading = false;
+        });
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Follow failed: $e')));
+      }
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    return TextButton(
-      onPressed: _toggleFollow,
-      style: TextButton.styleFrom(
-        backgroundColor: isFollowing ? Colors.grey[300] : Colors.deepOrange,
-        foregroundColor: isFollowing ? Colors.black : Colors.white,
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+    final Color targetColor = _isFollowing
+        ? Colors.grey.shade300
+        : Colors.deepOrange;
+    final Color fg = _isFollowing ? Colors.black : Colors.white;
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 250),
+      curve: Curves.easeInOut,
+      decoration: BoxDecoration(
+        color: targetColor,
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: _loading
+            ? [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.1),
+                  blurRadius: 6,
+                  offset: const Offset(0, 2),
+                ),
+              ]
+            : null,
       ),
-      child: Text(isFollowing ? "Followed" : "Follow"),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(24),
+          onTap: _toggleFollow,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 180),
+              transitionBuilder: (child, anim) => FadeTransition(
+                opacity: anim,
+                child: ScaleTransition(scale: anim, child: child),
+              ),
+              child: _loading
+                  ? SizedBox(
+                      key: const ValueKey('loading'),
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation<Color>(fg),
+                      ),
+                    )
+                  : Text(
+                      _isFollowing ? 'Following' : 'Follow',
+                      key: ValueKey(_isFollowing ? 'following' : 'follow'),
+                      style: TextStyle(
+                        color: fg,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 13,
+                      ),
+                    ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
